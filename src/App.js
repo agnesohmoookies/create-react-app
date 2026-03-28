@@ -43,15 +43,24 @@ const getMasterIngredientList = (allDishes) => {
   return [...new Set(allIngredients)].sort();
 };
 
+// Smart Categorizer for Ingredients
+const getIngredientCategory = (item) => {
+  const lower = item.toLowerCase();
+  if (lower.includes("pork")) return "Pork";
+  if (lower.includes("beef") || lower.includes("steak")) return "Beef";
+  if (lower.includes("chicken")) return "Chicken";
+  if (lower.includes("fish") || lower.includes("clam") || lower.includes("shrimp") || lower.includes("scallop") || lower.includes("pomfret") || lower.includes("halibut")) return "Seafood";
+  if (lower.includes("tofu")) return "Soy";
+  if (lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg")) return "Condiments";
+  return "Vegetables"; // Default fallback
+};
+
 export default function DinnerApp() {
   // --- 3. STATE MANAGEMENT ---
-  const [activeTab, setActiveTab] = useState("planner"); // 'planner' or 'inventory'
-  
-  // Settings
-  const [diningSize, setDiningSize] = useState("medium"); // small, medium, large
+  const [activeTab, setActiveTab] = useState("planner");
+  const [diningSize, setDiningSize] = useState("medium");
   const [existingOnly, setExistingOnly] = useState(false);
   
-  // Inventory (Local Storage)
   const [inventory, setInventory] = useState({});
   const masterIngredients = useMemo(() => getMasterIngredientList(DEFAULT_DISHES), []);
 
@@ -72,12 +81,11 @@ export default function DinnerApp() {
     localStorage.setItem("dinnerInventory", JSON.stringify(updated));
   };
 
-  // Menu State
-  const [mode, setMode] = useState("auto"); // 'auto' or 'manual'
+  const [mode, setMode] = useState("auto");
   const [generatedMenu, setGeneratedMenu] = useState(null);
   const [manualMenu, setManualMenu] = useState({ main: null, side: null, veg: null });
 
-  // --- 4. LOGIC: FILTERING & VALIDATION ---
+  // --- 4. LOGIC ---
   const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
 
   const getValidDishes = () => {
@@ -87,7 +95,6 @@ export default function DinnerApp() {
     );
   };
 
-  // Flow A: Auto Generate
   const handleAutoGenerate = () => {
     const valid = getValidDishes();
     const mains = valid.filter((d) => d.category === "main");
@@ -122,7 +129,6 @@ export default function DinnerApp() {
     setGeneratedMenu(newMenu);
   };
 
-  // Flow B: Manual Selection (Invisible Option A logic)
   const validForManual = getValidDishes();
   const usedManualProteins = [];
   if (manualMenu.main && manualMenu.main.protein !== "none") usedManualProteins.push(manualMenu.main.protein);
@@ -134,12 +140,11 @@ export default function DinnerApp() {
     vegs: validForManual.filter((d) => d.category === "veg" && !usedManualProteins.includes(d.protein))
   };
 
-  // --- 5. WHATSAPP & SHOPPING LIST ---
   const handleShare = (menuToShare) => {
     let required = [];
     if (menuToShare.main) required.push(...menuToShare.main.ingredients);
     if (menuToShare.sides) menuToShare.sides.forEach((s) => required.push(...s.ingredients));
-    if (menuToShare.side) required.push(...menuToShare.side.ingredients); // for manual single side
+    if (menuToShare.side) required.push(...menuToShare.side.ingredients);
     if (menuToShare.veg) required.push(...menuToShare.veg.ingredients);
 
     const uniqueRequired = [...new Set(required)];
@@ -152,32 +157,63 @@ export default function DinnerApp() {
     if (menuToShare.veg) text += `• Veg: ${menuToShare.veg.name}\n`;
 
     text += `\n🛒 *Shopping List*\n`;
-    if (shoppingList.length === 0) {
-      text += `Looks like we have everything! 🎉`;
-    } else {
-      shoppingList.forEach((item) => (text += `☐ ${item}\n`));
-    }
+    if (shoppingList.length === 0) text += `Looks like we have everything! 🎉`;
+    else shoppingList.forEach((item) => (text += `☐ ${item}\n`));
 
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
-  // --- 6. SIMPLE INLINE STYLES FOR QUICK TESTING ---
+  // --- 5. UI COMPONENTS & STYLES ---
   const styles = {
-    container: { fontFamily: "system-ui", maxWidth: "500px", margin: "0 auto", padding: "20px" },
+    container: { fontFamily: "system-ui", maxWidth: "500px", margin: "0 auto", padding: "20px", color: "#333" },
     nav: { display: "flex", gap: "10px", marginBottom: "20px" },
     tag: (isActive) => ({
-      padding: "8px 12px", borderRadius: "20px", border: "1px solid #007AFF", 
-      background: isActive ? "#007AFF" : "transparent",
-      color: isActive ? "white" : "#007AFF", cursor: "pointer", margin: "5px"
+      padding: "8px 14px", borderRadius: "20px", border: "1.5px solid #FF8CA1", 
+      background: isActive ? "#FF8CA1" : "transparent", fontWeight: "500",
+      color: isActive ? "white" : "#FF8CA1", cursor: "pointer", margin: "5px 5px 5px 0"
     }),
-    block: { marginBottom: "20px", padding: "15px", background: "#f5f5f7", borderRadius: "10px" },
-    btn: { background: "#34C759", color: "white", padding: "12px", border: "none", borderRadius: "10px", width: "100%", fontSize: "16px", cursor: "pointer", marginTop: "10px" }
+    block: { marginBottom: "20px", padding: "20px", background: "#f9f9f9", borderRadius: "16px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" },
+    btn: { background: "#FF8CA1", color: "white", padding: "14px", border: "none", borderRadius: "12px", width: "100%", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "10px", boxShadow: "0 4px 12px rgba(255, 140, 161, 0.3)" },
+    categoryHeader: { fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", color: "#888", marginTop: "15px", marginBottom: "8px" },
+    menuCard: { display: "flex", alignItems: "center", gap: "15px", padding: "10px 0", borderBottom: "1px solid #eee" }
   };
 
-  // --- 7. RENDER UI ---
+  // Pastel Illustration Component
+  const DishIcon = ({ type }) => {
+    let emoji = "🍲"; let bgColor = "#FFF0C2"; // Main (Pastel Orange/Yellow)
+    if (type === "side") { emoji = "🥗"; bgColor = "#D0E8FF"; } // Side (Pastel Blue)
+    if (type === "veg") { emoji = "🥦"; bgColor = "#D4F0D0"; } // Veg (Pastel Green)
+
+    return (
+      <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: bgColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0 }}>
+        {emoji}
+      </div>
+    );
+  };
+
+  // Render buttons grouped by protein
+  const renderGroupedDishes = (dishes, onSelect, selectedItem) => {
+    const proteins = ["pork", "beef", "chicken", "seafood", "none"];
+    return proteins.map(protein => {
+      const filtered = dishes.filter(d => d.protein === protein);
+      if (filtered.length === 0) return null;
+      return (
+        <div key={protein}>
+          <div style={styles.categoryHeader}>{protein === "none" ? "Veg/Other" : protein}</div>
+          <div>{filtered.map(d => (
+            <button key={d.id} style={styles.tag(selectedItem?.id === d.id)} onClick={() => onSelect(d)}>{d.name}</button>
+          ))}</div>
+        </div>
+      );
+    });
+  };
+
+  // Group inventory for display
+  const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Vegetables", "Condiments"];
+  
   return (
     <div style={styles.container}>
-      <h2>🍽️ Dinner Planner</h2>
+      <h2 style={{ textAlign: "center", color: "#FF8CA1" }}>🍽️ Dinner Planner</h2>
       
       <div style={styles.nav}>
         <button style={styles.tag(activeTab === "planner")} onClick={() => setActiveTab("planner")}>Meal Planner</button>
@@ -186,35 +222,43 @@ export default function DinnerApp() {
 
       {activeTab === "inventory" && (
         <div>
-          <h3>My Fridge & Pantry</h3>
-          <p>Tap to mark as unavailable (gray means you need to buy it).</p>
-          <div>
-            {masterIngredients.map((item) => (
-              <button
-                key={item}
-                style={{...styles.tag(inventory[item]), borderColor: inventory[item] ? '#007AFF' : '#ccc', color: inventory[item] ? 'white' : '#666'}}
-                onClick={() => toggleIngredient(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
+          <p style={{ color: "#666" }}>Tap to mark as unavailable (gray means you need to buy it).</p>
+          {inventoryCategories.map(category => {
+            const itemsInCategory = masterIngredients.filter(item => getIngredientCategory(item) === category);
+            if (itemsInCategory.length === 0) return null;
+            return (
+              <div key={category} style={styles.block}>
+                <h3 style={{ marginTop: 0, color: "#444" }}>{category}</h3>
+                <div>
+                  {itemsInCategory.map((item) => (
+                    <button
+                      key={item}
+                      style={{...styles.tag(inventory[item]), borderColor: inventory[item] ? '#FF8CA1' : '#ddd', color: inventory[item] ? 'white' : '#aaa'}}
+                      onClick={() => toggleIngredient(item)}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {activeTab === "planner" && (
         <div>
           <div style={styles.block}>
-            <label>Dining Size: </label>
-            <select value={diningSize} onChange={(e) => setDiningSize(e.target.value)}>
+            <label style={{ fontWeight: "bold" }}>Dining Size: </label>
+            <select style={{ marginLeft: "10px", padding: "5px", borderRadius: "8px", border: "1px solid #ddd" }} value={diningSize} onChange={(e) => setDiningSize(e.target.value)}>
               <option value="small">Small (2 Dishes)</option>
               <option value="medium">Medium (3 Dishes)</option>
               <option value="large">Large (4 Dishes)</option>
             </select>
             <br /><br />
-            <label>
-              <input type="checkbox" checked={existingOnly} onChange={(e) => setExistingOnly(e.target.checked)} />
-              {" "}Only use existing ingredients
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+              <input type="checkbox" checked={existingOnly} onChange={(e) => setExistingOnly(e.target.checked)} style={{ width: "18px", height: "18px" }}/>
+              Only use existing ingredients
             </label>
           </div>
 
@@ -225,14 +269,33 @@ export default function DinnerApp() {
 
           {mode === "auto" && (
             <div>
-              <button style={{...styles.btn, background: "#007AFF"}} onClick={handleAutoGenerate}>🎲 Generate Dinner</button>
+              <button style={styles.btn} onClick={handleAutoGenerate}>✨ Whip Up a Delicious Menu! ✨</button>
               {generatedMenu && (
-                <div style={styles.block}>
-                  <h4>Menu Locked In:</h4>
-                  <p><strong>Main:</strong> {generatedMenu.main?.name}</p>
-                  {generatedMenu.sides.map((s, i) => <p key={i}><strong>Side:</strong> {s.name}</p>)}
-                  <p><strong>Veg:</strong> {generatedMenu.veg?.name}</p>
-                  <button style={styles.btn} onClick={() => handleShare(generatedMenu)}>Share to WhatsApp 💬</button>
+                <div style={{...styles.block, marginTop: "20px"}}>
+                  <h3 style={{ marginTop: 0 }}>Tonights Menu:</h3>
+                  
+                  {generatedMenu.main && (
+                    <div style={styles.menuCard}>
+                      <DishIcon type="main" />
+                      <div><div style={{ fontSize: "12px", color: "#888" }}>MAIN DISH</div><div style={{ fontWeight: "bold" }}>{generatedMenu.main.name}</div></div>
+                    </div>
+                  )}
+                  
+                  {generatedMenu.sides.map((s, i) => (
+                    <div style={styles.menuCard} key={i}>
+                      <DishIcon type="side" />
+                      <div><div style={{ fontSize: "12px", color: "#888" }}>SIDE DISH</div><div style={{ fontWeight: "bold" }}>{s.name}</div></div>
+                    </div>
+                  ))}
+
+                  {generatedMenu.veg && (
+                    <div style={{...styles.menuCard, borderBottom: "none"}}>
+                      <DishIcon type="veg" />
+                      <div><div style={{ fontSize: "12px", color: "#888" }}>VEGETABLE</div><div style={{ fontWeight: "bold" }}>{generatedMenu.veg.name}</div></div>
+                    </div>
+                  )}
+
+                  <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)"}} onClick={() => handleShare(generatedMenu)}>Share to WhatsApp 💬</button>
                 </div>
               )}
             </div>
@@ -240,27 +303,25 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
-              <h4>Main Dish</h4>
-              <div>{manualOptions.mains.map(d => (
-                <button key={d.id} style={styles.tag(manualMenu.main?.id === d.id)} onClick={() => setManualMenu({...manualMenu, main: d, side: null, veg: null})}>{d.name}</button>
-              ))}</div>
+              <div style={styles.block}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}><DishIcon type="main" /><h3 style={{ margin: 0 }}>Select Main</h3></div>
+                {renderGroupedDishes(manualOptions.mains, (d) => setManualMenu({...manualMenu, main: d, side: null, veg: null}), manualMenu.main)}
+              </div>
 
               {diningSize !== "small" && (
-                <>
-                  <h4>Side Dish</h4>
-                  <div>{manualOptions.sides.map(d => (
-                    <button key={d.id} style={styles.tag(manualMenu.side?.id === d.id)} onClick={() => setManualMenu({...manualMenu, side: d, veg: null})}>{d.name}</button>
-                  ))}</div>
-                </>
+                <div style={styles.block}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}><DishIcon type="side" /><h3 style={{ margin: 0 }}>Select Side</h3></div>
+                  {renderGroupedDishes(manualOptions.sides, (d) => setManualMenu({...manualMenu, side: d, veg: null}), manualMenu.side)}
+                </div>
               )}
 
-              <h4>Vegetable</h4>
-              <div>{manualOptions.vegs.map(d => (
-                <button key={d.id} style={styles.tag(manualMenu.veg?.id === d.id)} onClick={() => setManualMenu({...manualMenu, veg: d})}>{d.name}</button>
-              ))}</div>
+              <div style={styles.block}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}><DishIcon type="veg" /><h3 style={{ margin: 0 }}>Select Vegetable</h3></div>
+                {renderGroupedDishes(manualOptions.vegs, (d) => setManualMenu({...manualMenu, veg: d}), manualMenu.veg)}
+              </div>
 
               {(manualMenu.main && manualMenu.veg && (diningSize === "small" || manualMenu.side)) && (
-                <button style={styles.btn} onClick={() => handleShare(manualMenu)}>Share to WhatsApp 💬</button>
+                <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginBottom: "30px"}} onClick={() => handleShare(manualMenu)}>Share to WhatsApp 💬</button>
               )}
             </div>
           )}
