@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 
-// --- 1. OUR DATABASE (UPDATED FROM GOOGLE SHEETS) ---
+// --- 1. OUR DATABASE ---
 const DEFAULT_DISHES = [
   { id: "m1", name: "Dumplings in two types (Chinese chive and minced pork, Chinese celery, Chinese mushroom and minced pork)", category: "main", protein: "pork", ingredients: ["dumpling skin", "minced pork", "Chinese chive", "Chinese celery", "Chinese mushroom"] },
   { id: "m2", name: "Rice in winter melon, minced pork, Chinese mushroom, Coriander soup", category: "main", protein: "pork", ingredients: ["winter melon", "minced pork", "Chinese mushroom", "coriander"] },
@@ -86,7 +86,7 @@ const DEFAULT_DISHES = [
   { id: "v3", name: "Stir fry spinach", category: "veg", protein: "none", ingredients: ["spinach", "garlic"] },
   { id: "v4", name: "Stir fry beef slices and Choi Sum", category: "veg", protein: "beef", ingredients: ["beef slice", "choi sum"] },
   { id: "v5", name: "Stir fry cauliflower", category: "veg", protein: "none", ingredients: ["cauliflower", "garlic"] },
-  { id: "v6", name: "Stir fry broccoli and scallops", category: "veg", protein: "seafood", ingredients: ["broccoli", "scallops"] },
+  { id: "v6", name: "Stir fry broccoli and scallop", category: "veg", protein: "seafood", ingredients: ["broccoli", "scallop"] },
   { id: "v7", name: "Stir fry broccoli", category: "veg", protein: "none", ingredients: ["broccoli"] },
   { id: "v8", name: "Stir fry Chinese Lettuce", category: "veg", protein: "none", ingredients: ["chinese lettuce"] },
   { id: "v9", name: "Chinese cabbage in ginger soymilk soup", category: "veg", protein: "none", ingredients: ["chinese cabbage", "soy milk", "ginger"] },
@@ -102,7 +102,9 @@ const DEFAULT_DISHES = [
 // --- 2. HELPER FUNCTIONS ---
 const getRandomDish = (dishes) => dishes[Math.floor(Math.random() * dishes.length)];
 
-// Ingredients are extracted and automatically sorted alphabetically here
+// Strips out text inside parentheses specifically for UI display
+const formatNameUI = (name) => name.replace(/\s*\(.*?\)/g, '');
+
 const getMasterIngredientList = (allDishes) => {
   const allIngredients = allDishes.flatMap((dish) => dish.ingredients);
   return [...new Set(allIngredients)].sort();
@@ -110,33 +112,43 @@ const getMasterIngredientList = (allDishes) => {
 
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
+  
+  // Condiments
+  if (lower.includes("rice paper") || lower.includes("scallion") || lower.includes("onion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
+  
+  // Proteins
   if (lower.includes("pork") || lower.includes("cha siu")) return "Pork";
   if (lower.includes("beef") || lower.includes("steak") || lower.includes("oxtail")) return "Beef";
   if (lower.includes("chicken")) return "Chicken";
   if (lower.includes("fish") || lower.includes("clam") || lower.includes("shrimp") || lower.includes("scallop") || lower.includes("pomfret") || lower.includes("halibut") || lower.includes("squid") || lower.includes("octopus") || lower.includes("salmon") || lower.includes("noodlefish")) return "Seafood";
   if (lower.includes("tofu") || lower.includes("soy")) return "Soy";
-  if (lower.includes("eggplant")) return "Vegetables"; 
-  if (lower.includes("scallion") || lower.includes("onion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
-  return "Vegetables"; 
+  
+  // Veggie Sub-categories!
+  if (lower.includes("mushroom") || lower.includes("fungus")) return "Mushrooms";
+  if (lower.includes("cabbage") || lower.includes("pak choi") || lower.includes("choi sum") || lower.includes("spinach") || lower.includes("lettuce")) return "Leafy Greens";
+  if (lower.includes("potato") || lower.includes("carrot") || lower.includes("radish") || lower.includes("melon") || lower.includes("chayote") || lower.includes("pumpkin") || lower.includes("yam") || lower.includes("chestnut")) return "Root Veggies & Gourds";
+  
+  return "Other Veggies"; 
 };
 
 export default function DinnerApp() {
   // --- 3. STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState("planner"); 
   const [diningSize, setDiningSize] = useState("medium");
+  const [largeFormat, setLargeFormat] = useState("1m2s"); // '1m2s' or '2m1s'
   const [existingOnly, setExistingOnly] = useState(false);
   
   // Custom Dishes State
   const [customDishes, setCustomDishes] = useState([]);
-  const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "pork", ingredients: "", remarks: "" });
-
-  const [inventory, setInventory] = useState({});
+  const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "" });
+  const [ingredientInput, setIngredientInput] = useState("");
   
-  // Combine default and custom dishes
+  const [inventory, setInventory] = useState({});
+  const [inventorySearch, setInventorySearch] = useState("");
+  
   const allDishes = useMemo(() => [...DEFAULT_DISHES, ...customDishes], [customDishes]);
   const masterIngredients = useMemo(() => getMasterIngredientList(allDishes), [allDishes]);
 
-  // Load saved data on startup
   useEffect(() => {
     const savedInventory = localStorage.getItem("dinnerInventory");
     const savedDishes = localStorage.getItem("customDishes");
@@ -152,7 +164,6 @@ export default function DinnerApp() {
     }
   }, []);
 
-  // Sync new ingredients to inventory automatically
   useEffect(() => {
     setInventory(prev => {
       const updated = { ...prev };
@@ -175,14 +186,14 @@ export default function DinnerApp() {
   };
 
   const handleAddDish = () => {
-    if (!newDish.name || !newDish.ingredients) return alert("Please fill in name and ingredients!");
+    if (!newDish.name || newDish.ingredients.length === 0) return alert("Please fill in name and at least one ingredient!");
     
     const dishToSave = {
       id: "c_" + Date.now(),
       name: newDish.name,
       category: newDish.category,
       protein: newDish.protein,
-      ingredients: newDish.ingredients.split(",").map(i => i.trim().toLowerCase()).filter(i => i),
+      ingredients: newDish.ingredients,
       remarks: newDish.remarks.trim()
     };
     
@@ -191,12 +202,14 @@ export default function DinnerApp() {
     localStorage.setItem("customDishes", JSON.stringify(updatedDishes));
     
     alert("Dish added successfully!");
-    setNewDish({ name: "", category: "main", protein: "pork", ingredients: "", remarks: "" });
+    setNewDish({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "" });
   };
 
   const [mode, setMode] = useState("auto");
   const [generatedMenu, setGeneratedMenu] = useState(null);
-  const [manualMenu, setManualMenu] = useState({ main: null, side: null, veg: null });
+  
+  // Updated Manual Menu State to handle arrays of mains/sides
+  const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
 
   // --- 4. LOGIC ---
   const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
@@ -215,25 +228,36 @@ export default function DinnerApp() {
     const vegs = valid.filter((d) => d.category === "veg");
 
     let usedProteins = [];
-    let newMenu = { main: null, sides: [], veg: null };
+    let newMenu = { mains: [], sides: [], veg: null };
 
-    if (mains.length > 0) {
-      newMenu.main = getRandomDish(mains);
-      if (newMenu.main.protein !== "none") usedProteins.push(newMenu.main.protein);
-    }
+    const numMains = (diningSize === "large" && largeFormat === "2m1s") ? 2 : 1;
+    const numSides = diningSize === "small" ? 0 : ((diningSize === "large" && largeFormat === "1m2s") ? 2 : 1);
 
-    let numSides = diningSize === "small" ? 0 : diningSize === "medium" ? 1 : 2;
-    for (let i = 0; i < numSides; i++) {
-      const availableSides = sides.filter(
-        (s) => !usedProteins.includes(s.protein) && !newMenu.sides.includes(s)
-      );
-      if (availableSides.length > 0) {
-        const picked = getRandomDish(availableSides);
-        newMenu.sides.push(picked);
-        if (picked.protein !== "none") usedProteins.push(picked.protein);
+    // Pick Mains
+    for (let i = 0; i < numMains; i++) {
+      const availableMains = mains.filter(m => !usedProteins.includes(m.protein) && !newMenu.mains.includes(m));
+      if (availableMains.length > 0) {
+        const picked = getRandomDish(availableMains);
+        newMenu.mains.push(picked);
+        if (picked.protein !== "none" && picked.protein !== "seafood") {
+          usedProteins.push(picked.protein);
+        }
       }
     }
 
+    // Pick Sides
+    for (let i = 0; i < numSides; i++) {
+      const availableSides = sides.filter(s => !usedProteins.includes(s.protein) && !newMenu.sides.includes(s));
+      if (availableSides.length > 0) {
+        const picked = getRandomDish(availableSides);
+        newMenu.sides.push(picked);
+        if (picked.protein !== "none" && picked.protein !== "seafood") {
+          usedProteins.push(picked.protein);
+        }
+      }
+    }
+
+    // Pick Veg
     const availableVegs = vegs.filter((v) => !usedProteins.includes(v.protein));
     if (availableVegs.length > 0) {
       newMenu.veg = getRandomDish(availableVegs);
@@ -243,34 +267,34 @@ export default function DinnerApp() {
   };
 
   const validForManual = getValidDishes();
-  const usedManualProteins = [];
-  if (manualMenu.main && manualMenu.main.protein !== "none") usedManualProteins.push(manualMenu.main.protein);
-  if (manualMenu.side && manualMenu.side.protein !== "none") usedManualProteins.push(manualMenu.side.protein);
+  
+  // Get options for a specific manual slot by excluding proteins selected in OTHER slots
+  const getManualOptions = (type, indexToExclude) => {
+    let used = [];
+    manualMenu.mains.forEach((m, idx) => {
+      if (m && !(type === 'main' && indexToExclude === idx) && m.protein !== "none" && m.protein !== "seafood") used.push(m.protein);
+    });
+    manualMenu.sides.forEach((s, idx) => {
+      if (s && !(type === 'side' && indexToExclude === idx) && s.protein !== "none" && s.protein !== "seafood") used.push(s.protein);
+    });
 
-  const manualOptions = {
-    mains: validForManual.filter((d) => d.category === "main"),
-    sides: validForManual.filter((d) => d.category === "side" && !usedManualProteins.includes(d.protein)),
-    vegs: validForManual.filter((d) => d.category === "veg" && !usedManualProteins.includes(d.protein))
+    return validForManual.filter(d => d.category === type && !used.includes(d.protein));
   };
 
   const handleShare = (menuToShare) => {
     let required = [];
-    if (menuToShare.main) required.push(...menuToShare.main.ingredients);
+    if (menuToShare.mains) menuToShare.mains.forEach((m) => required.push(...m.ingredients));
     if (menuToShare.sides) menuToShare.sides.forEach((s) => required.push(...s.ingredients));
-    if (menuToShare.side) required.push(...menuToShare.side.ingredients);
     if (menuToShare.veg) required.push(...menuToShare.veg.ingredients);
 
     const uniqueRequired = [...new Set(required)];
     const shoppingList = uniqueRequired.filter((ing) => !inventory[ing]);
 
-    // Format WhatsApp Message (including remarks!)
     let text = `*Tonight's Dinner*\n`;
-    if (menuToShare.main) text += `• ${menuToShare.main.name}${menuToShare.main.remarks ? ` (${menuToShare.main.remarks})` : ""}\n`;
+    if (menuToShare.mains) menuToShare.mains.forEach((m) => (text += `• ${m.name}${m.remarks ? ` (${m.remarks})` : ""}\n`));
     if (menuToShare.sides) menuToShare.sides.forEach((s) => (text += `• ${s.name}${s.remarks ? ` (${s.remarks})` : ""}\n`));
-    if (menuToShare.side) text += `• ${menuToShare.side.name}${menuToShare.side.remarks ? ` (${menuToShare.side.remarks})` : ""}\n`;
     if (menuToShare.veg) text += `• ${menuToShare.veg.name}${menuToShare.veg.remarks ? ` (${menuToShare.veg.remarks})` : ""}\n`;
 
-    // Only append Shopping List if there are things to buy
     if (shoppingList.length > 0) {
       text += `\n*Shopping List*\n`;
       shoppingList.forEach((item) => (text += `☐ ${item}\n`));
@@ -284,7 +308,7 @@ export default function DinnerApp() {
     container: { fontFamily: "system-ui", maxWidth: "500px", margin: "0 auto", padding: "15px", color: "#333" },
     nav: { display: "flex", gap: "8px", marginBottom: "20px", overflowX: "auto", paddingBottom: "5px" },
     tag: (isActive) => ({
-      padding: "10px 16px", borderRadius: "20px", border: "1.5px solid #FF8CA1", 
+      padding: "10px 16px", borderRadius: "20px", border: "1.5px solid #FF8CA1", fontSize: "14px",
       background: isActive ? "#FF8CA1" : "transparent", fontWeight: "600", whiteSpace: "nowrap",
       color: isActive ? "white" : "#FF8CA1", cursor: "pointer", margin: "5px 5px 5px 0"
     }),
@@ -295,10 +319,9 @@ export default function DinnerApp() {
     input: { width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #ddd", marginBottom: "15px", boxSizing: "border-box", fontSize: "16px" }
   };
 
-  // The updated big squircle icons with specific emojis
   const DishIcon = ({ type }) => {
-    let emoji = "🍲"; let bgColor = "#FFF0C2"; // Option A: Stew
-    if (type === "side") { emoji = "🍤"; bgColor = "#D0E8FF"; } // Option B: Just Shrimp
+    let emoji = "🍲"; let bgColor = "#FFF0C2"; 
+    if (type === "side") { emoji = "🍤"; bgColor = "#D0E8FF"; } 
     if (type === "veg") { emoji = "🥦"; bgColor = "#D4F0D0"; } 
 
     return (
@@ -307,7 +330,7 @@ export default function DinnerApp() {
         borderRadius: "16px", 
         backgroundColor: bgColor, 
         display: "flex", alignItems: "center", justifyContent: "center", 
-        fontSize: "44px", // Scaled up size!
+        fontSize: "44px", 
         flexShrink: 0 
       }}>
         {emoji}
@@ -315,17 +338,42 @@ export default function DinnerApp() {
     );
   };
 
-  const renderGroupedDishes = (dishes, onSelect, selectedItem) => {
-    const proteins = ["pork", "beef", "chicken", "seafood", "none"];
-    return proteins.map(protein => {
-      const filtered = dishes.filter(d => d.protein === protein);
+  const renderGroupedDishes = (dishes, onSelect, selectedItem, isSide = false) => {
+    const defaultGroups = [
+      { id: "pork", label: "Pork" }, { id: "beef", label: "Beef" }, 
+      { id: "chicken", label: "Chicken" }, { id: "seafood", label: "Seafood" }, 
+      { id: "none", label: "Veg/Other" }
+    ];
+    
+    const sideGroups = [
+      { id: "cold", label: "Cold Dish" }, { id: "egg", label: "Egg" }, ...defaultGroups
+    ];
+
+    const groupsToUse = isSide ? sideGroups : defaultGroups;
+
+    return groupsToUse.map(group => {
+      const filtered = dishes.filter(d => {
+        const lowerName = d.name.toLowerCase();
+        if (isSide) {
+          const isCold = lowerName.includes("cold");
+          const isEgg = !isCold && (lowerName.includes("steam egg") || lowerName.includes("stir fry egg") || lowerName.includes("fry egg"));
+          
+          if (group.id === "cold") return isCold;
+          if (group.id === "egg") return isEgg;
+          if (isCold || isEgg) return false; 
+        }
+        return d.protein === group.id;
+      });
+
       if (filtered.length === 0) return null;
       return (
-        <div key={protein}>
-          <div style={styles.categoryHeader}>{protein === "none" ? "Veg/Other" : protein}</div>
+        <div key={group.id}>
+          <div style={styles.categoryHeader}>{group.label}</div>
           <div style={{ display: "flex", flexWrap: "wrap" }}>
             {filtered.map(d => (
-              <button key={d.id} style={styles.tag(selectedItem?.id === d.id)} onClick={() => onSelect(d)}>{d.name}</button>
+              <button key={d.id} style={styles.tag(selectedItem?.id === d.id)} onClick={() => onSelect(d)}>
+                {formatNameUI(d.name)}
+              </button>
             ))}
           </div>
         </div>
@@ -333,8 +381,12 @@ export default function DinnerApp() {
     });
   };
 
-  const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Vegetables", "Condiments"];
+  const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Condiments"];
   
+  // Calculate how many sections to render based on dinner size setting
+  const numMains = (diningSize === "large" && largeFormat === "2m1s") ? 2 : 1;
+  const numSides = diningSize === "small" ? 0 : ((diningSize === "large" && largeFormat === "1m2s") ? 2 : 1);
+
   return (
     <div style={styles.container}>
       <h2 style={{ textAlign: "center", color: "#FF8CA1", margin: "10px 0 20px 0" }}>🍽️ Dinner Planner</h2>
@@ -347,7 +399,7 @@ export default function DinnerApp() {
 
       {activeTab === "add" && (
         <div style={styles.block}>
-          <h3 style={{ marginTop: 0 }}>Add a New Recipe</h3>
+          <h3 style={{ marginTop: 0 }}>Add a New Dish</h3>
           
           <label style={{fontWeight: "bold", fontSize: "14px"}}>Dish Name</label>
           <input style={styles.input} placeholder="e.g. Tomato Egg Stir Fry" value={newDish.name} onChange={e => setNewDish({...newDish, name: e.target.value})} />
@@ -366,11 +418,62 @@ export default function DinnerApp() {
             ))}
           </div>
 
-          <label style={{fontWeight: "bold", fontSize: "14px"}}>Ingredients (Comma separated)</label>
-          <input style={styles.input} placeholder="e.g. tomato, egg, garlic" value={newDish.ingredients} onChange={e => setNewDish({...newDish, ingredients: e.target.value})} />
+          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Ingredients</label>
+          
+          {/* Tag Pills for selected ingredients */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
+            {newDish.ingredients.map(ing => (
+              <span key={ing} style={{ background: "#FF8CA1", color: "white", padding: "6px 12px", borderRadius: "15px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold" }}>
+                {ing} 
+                <button style={{ border: "none", background: "none", cursor: "pointer", color: "white", padding: 0, fontWeight: "bold", fontSize: "16px" }} onClick={() => setNewDish({...newDish, ingredients: newDish.ingredients.filter(i => i !== ing)})}>×</button>
+              </span>
+            ))}
+          </div>
 
-          <label style={{fontWeight: "bold", fontSize: "14px"}}>Remarks (Optional)</label>
-          <input style={styles.input} placeholder="e.g. Cookbook p.92" value={newDish.remarks} onChange={e => setNewDish({...newDish, remarks: e.target.value})} />
+          {/* Autocomplete Input */}
+          <input 
+            style={{...styles.input, marginBottom: "0"}} 
+            placeholder="Type an ingredient & press enter..." 
+            value={ingredientInput} 
+            onChange={e => setIngredientInput(e.target.value)}
+            onKeyDown={e => {
+              if(e.key === 'Enter' && ingredientInput.trim()) {
+                const term = ingredientInput.trim().toLowerCase();
+                if(!newDish.ingredients.includes(term)) {
+                  setNewDish({...newDish, ingredients: [...newDish.ingredients, term]});
+                }
+                setIngredientInput("");
+              }
+            }}
+          />
+          {ingredientInput && (
+            <div style={{ border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", marginBottom: "15px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
+              {masterIngredients.filter(i => i.includes(ingredientInput.toLowerCase())).slice(0, 5).map(sug => (
+                <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
+                  if(!newDish.ingredients.includes(sug)) {
+                    setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
+                  }
+                  setIngredientInput("");
+                }}>
+                  {sug}
+                </div>
+              ))}
+              {/* Option to add novel ingredient */}
+              {!masterIngredients.includes(ingredientInput.trim().toLowerCase()) && (
+                <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
+                  setNewDish({...newDish, ingredients: [...newDish.ingredients, ingredientInput.trim().toLowerCase()]});
+                  setIngredientInput("");
+                }}>
+                  + Add new: "{ingredientInput}"
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{marginTop: "15px"}}>
+            <label style={{fontWeight: "bold", fontSize: "14px"}}>Remarks (Optional)</label>
+            <input style={styles.input} placeholder="e.g. Cookbook p.92" value={newDish.remarks} onChange={e => setNewDish({...newDish, remarks: e.target.value})} />
+          </div>
 
           <button style={styles.btn} onClick={handleAddDish}>Save Dish</button>
         </div>
@@ -378,14 +481,24 @@ export default function DinnerApp() {
 
       {activeTab === "inventory" && (
         <div>
+          <input 
+            style={{...styles.input, marginBottom: '20px', borderRadius: '20px', padding: '14px 20px'}} 
+            placeholder="🔍 Search ingredients..." 
+            value={inventorySearch}
+            onChange={e => setInventorySearch(e.target.value)}
+          />
+
           {inventoryCategories.map(category => {
             const itemsInCategory = masterIngredients.filter(item => getIngredientCategory(item) === category);
-            if (itemsInCategory.length === 0) return null;
+            const searchedItems = itemsInCategory.filter(item => item.toLowerCase().includes(inventorySearch.toLowerCase()));
+            
+            if (searchedItems.length === 0) return null; 
+            
             return (
               <div key={category} style={styles.block}>
                 <h3 style={{ marginTop: 0, color: "#444" }}>{category}</h3>
                 <div style={{ display: "flex", flexWrap: "wrap" }}>
-                  {itemsInCategory.map((item) => (
+                  {searchedItems.map((item) => (
                     <button
                       key={item}
                       style={{...styles.tag(inventory[item]), borderColor: inventory[item] ? '#FF8CA1' : '#ddd', color: inventory[item] ? 'white' : '#aaa'}}
@@ -414,12 +527,27 @@ export default function DinnerApp() {
                 <button 
                   key={size.id} 
                   style={styles.tag(diningSize === size.id)} 
-                  onClick={() => setDiningSize(size.id)}
+                  onClick={() => {
+                    setDiningSize(size.id);
+                    // Reset menu to prevent orphan selections when downsizing
+                    setManualMenu({ mains: [], sides: [], veg: null });
+                  }}
                 >
                   {size.label}
                 </button>
               ))}
             </div>
+
+            {/* Toggle for Large Dinners */}
+            {diningSize === "large" && (
+              <div style={{ marginTop: "15px", padding: "12px", background: "#fff", borderRadius: "12px", border: "1px solid #eee" }}>
+                 <label style={{ fontSize: "14px", fontWeight: "bold", color: "#666", display: "block", marginBottom: "8px" }}>Large Menu Format:</label>
+                 <div style={{ display: "flex", gap: "5px" }}>
+                   <button style={styles.tag(largeFormat === "1m2s")} onClick={() => {setLargeFormat("1m2s"); setManualMenu({ mains: [], sides: [], veg: null });}}>1 Main, 2 Sides</button>
+                   <button style={styles.tag(largeFormat === "2m1s")} onClick={() => {setLargeFormat("2m1s"); setManualMenu({ mains: [], sides: [], veg: null });}}>2 Mains, 1 Side</button>
+                 </div>
+              </div>
+            )}
             
             <div style={{ marginTop: "20px" }}>
               <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "500", fontSize: "14px" }}>
@@ -430,32 +558,32 @@ export default function DinnerApp() {
           </div>
 
           <div style={{...styles.nav, borderBottom: "2px solid #eee", paddingBottom: "15px"}}>
-            <button style={{...styles.tag(mode === "auto"), flex: 1}} onClick={() => setMode("auto")}>Auto-Suggest</button>
-            <button style={{...styles.tag(mode === "manual"), flex: 1}} onClick={() => setMode("manual")}>Manual Build</button>
+            <button style={{...styles.tag(mode === "auto"), flex: 1}} onClick={() => setMode("auto")}>Surprise me</button>
+            <button style={{...styles.tag(mode === "manual"), flex: 1}} onClick={() => setMode("manual")}>Let me think</button>
           </div>
 
           {mode === "auto" && (
             <div>
-              <button style={styles.btn} onClick={handleAutoGenerate}>✨ Surprise Me! ✨</button>
+              <button style={styles.btn} onClick={handleAutoGenerate}>What's for dinner tonight?</button>
               {generatedMenu && (
                 <div style={{...styles.block, marginTop: "20px"}}>
                   <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
                   
-                  {generatedMenu.main && (
-                    <div style={styles.menuCard}>
+                  {generatedMenu.mains.map((m, i) => (
+                    <div style={styles.menuCard} key={`auto-m-${i}`}>
                       <DishIcon type="main" />
                       <div>
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{generatedMenu.main.name}</div>
-                        {generatedMenu.main.remarks && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{generatedMenu.main.remarks}</div>}
+                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
+                        {m.remarks && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{m.remarks}</div>}
                       </div>
                     </div>
-                  )}
+                  ))}
                   
                   {generatedMenu.sides.map((s, i) => (
-                    <div style={styles.menuCard} key={i}>
+                    <div style={styles.menuCard} key={`auto-s-${i}`}>
                       <DishIcon type="side" />
                       <div>
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{s.name}</div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
                         {s.remarks && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{s.remarks}</div>}
                       </div>
                     </div>
@@ -465,7 +593,7 @@ export default function DinnerApp() {
                     <div style={{...styles.menuCard, borderBottom: "none"}}>
                       <DishIcon type="veg" />
                       <div>
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{generatedMenu.veg.name}</div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
                         {generatedMenu.veg.remarks && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{generatedMenu.veg.remarks}</div>}
                       </div>
                     </div>
@@ -479,24 +607,36 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
-              <div style={styles.block}>
-                <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main</h3></div>
-                {renderGroupedDishes(manualOptions.mains, (d) => setManualMenu({...manualMenu, main: d, side: null, veg: null}), manualMenu.main)}
-              </div>
-
-              {diningSize !== "small" && (
-                <div style={styles.block}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side</h3></div>
-                  {renderGroupedDishes(manualOptions.sides, (d) => setManualMenu({...manualMenu, side: d, veg: null}), manualMenu.side)}
+              {/* Dynamic Main Slots */}
+              {[...Array(numMains)].map((_, i) => (
+                <div style={styles.block} key={`man-m-${i}`}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? i+1 : ''}</h3></div>
+                  {renderGroupedDishes(getManualOptions('main', i), (d) => {
+                     const newMains = [...manualMenu.mains];
+                     newMains[i] = d;
+                     setManualMenu({...manualMenu, mains: newMains});
+                  }, manualMenu.mains[i], false)}
                 </div>
-              )}
+              ))}
+
+              {/* Dynamic Side Slots */}
+              {[...Array(numSides)].map((_, i) => (
+                <div style={styles.block} key={`man-s-${i}`}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? i+1 : ''}</h3></div>
+                  {renderGroupedDishes(getManualOptions('side', i), (d) => {
+                     const newSides = [...manualMenu.sides];
+                     newSides[i] = d;
+                     setManualMenu({...manualMenu, sides: newSides});
+                  }, manualMenu.sides[i], true)}
+                </div>
+              ))}
 
               <div style={styles.block}>
                 <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
-                {renderGroupedDishes(manualOptions.vegs, (d) => setManualMenu({...manualMenu, veg: d}), manualMenu.veg)}
+                {renderGroupedDishes(getManualOptions('veg', -1), (d) => setManualMenu({...manualMenu, veg: d}), manualMenu.veg, false)}
               </div>
 
-              {(manualMenu.main && manualMenu.veg && (diningSize === "small" || manualMenu.side)) && (
+              {(manualMenu.mains.length === numMains && !manualMenu.mains.includes(undefined) && manualMenu.veg && (manualMenu.sides.length === numSides && !manualMenu.sides.includes(undefined))) && (
                 <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginBottom: "30px"}} onClick={() => handleShare(manualMenu)}>Send to WhatsApp</button>
               )}
             </div>
