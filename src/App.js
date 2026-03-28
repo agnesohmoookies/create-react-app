@@ -2,19 +2,19 @@ import React, { useState, useEffect, useMemo } from "react";
 
 // --- 1. OUR DATABASE ---
 const DEFAULT_DISHES = [
-  { id: "m1", name: "Dumplings in two types (Chinese chive and minced pork, Chinese celery, Chinese mushroom and minced pork)", category: "main", protein: "pork", ingredients: ["dumpling skin", "minced pork", "Chinese chive", "Chinese celery", "Chinese mushroom"] },
-  { id: "m2", name: "Rice in winter melon, minced pork, Chinese mushroom, Coriander soup", category: "main", protein: "pork", ingredients: ["winter melon", "minced pork", "Chinese mushroom", "coriander"] },
+  { id: "m1", name: "Dumplings in two types (Chinese chive and minced pork, Chinese celery, Chinese mushroom and minced pork)", category: "main", protein: "pork", ingredients: ["dumpling skin", "minced pork", "Chinese chive", "Chinese celery", "Chinese mushroom"], onePerson: true },
+  { id: "m2", name: "Rice in winter melon, minced pork, Chinese mushroom, Coriander soup", category: "main", protein: "pork", ingredients: ["winter melon", "minced pork", "Chinese mushroom", "coriander"], onePerson: true },
   { id: "m3", name: "Steam shrimps with garlic and vermicelli", category: "main", protein: "seafood", ingredients: ["fresh shrimp", "garlic", "vermicelli"] },
   { id: "m4", name: "Pork ribs and chestnut stew", category: "main", protein: "pork", ingredients: ["pork ribs", "chestnut"] },
   { id: "m5", name: "Apple and pork rolls", category: "main", protein: "pork", ingredients: ["pork slices", "apple"] },
   { id: "m6", name: "Whole chicken thigh with apple, onion and Chinese cabbage", category: "main", protein: "chicken", ingredients: ["whole chicken thigh", "apple", "onion", "Chinese cabbage"] },
-  { id: "m7", name: "Chicken curry with onion, bell pepper, potato and carrot", category: "main", protein: "chicken", ingredients: ["chicken thigh", "curry powder", "onion", "bell pepper", "potato", "carrot", "coconut cream"] },
+  { id: "m7", name: "Chicken curry with onion, bell pepper, potato and carrot", category: "main", protein: "chicken", ingredients: ["chicken thigh", "curry powder", "onion", "bell pepper", "potato", "carrot", "coconut cream"], onePerson: true },
   { id: "m8", name: "Roasted whole pork ribs", category: "main", protein: "pork", ingredients: ["whole pork ribs", "tomato sauce", "black pepper sauce"] },
   { id: "m9", name: "Stir fry chicken thigh with Chinese mushroom, cashew and ginger", category: "main", protein: "chicken", ingredients: ["chicken thigh", "Chinese mushroom", "cashew", "ginger"] },
   { id: "m10", name: "Stir fry pork slice with mushroom", category: "main", protein: "pork", ingredients: ["pork slice", "mushroom"] },
   { id: "m11", name: "Stir fry chicken thigh with celery and cashew", category: "main", protein: "chicken", ingredients: ["chicken thigh", "celery", "cashew"] },
   { id: "m12", name: "Stir fry chicken thigh with king mushroom", category: "main", protein: "chicken", ingredients: ["chicken thigh", "king mushroom"] },
-  { id: "m13", name: "Pork chop curry with onion, potato and carrot", category: "main", protein: "pork", ingredients: ["pork chop", "curry powder", "onion", "potato", "carrot", "coconut cream"] },
+  { id: "m13", name: "Pork chop curry with onion, potato and carrot", category: "main", protein: "pork", ingredients: ["pork chop", "curry powder", "onion", "potato", "carrot", "coconut cream"], onePerson: true },
   { id: "m14", name: "Roasted chicken wings", category: "main", protein: "chicken", ingredients: ["chicken wings"] },
   { id: "m15", name: "Chicken wing and potato stew", category: "main", protein: "chicken", ingredients: ["chicken wings", "potato"] },
   { id: "m16", name: "Pork ribs and potato stew", category: "main", protein: "pork", ingredients: ["pork ribs", "potato"] },
@@ -22,11 +22,11 @@ const DEFAULT_DISHES = [
   { id: "m18", name: "Salmon with tofu, onion, Chinese cabbage, leak and Shimeji miso soymilk stew", category: "main", protein: "seafood", ingredients: ["salmon", "tofu", "onion", "Chinese cabbage", "leek", "shimeji mushroom", "miso", "soy milk"] },
   { id: "m19", name: "Salmon steak with sweet and sour sauce", category: "main", protein: "seafood", ingredients: ["salmon steak", "bell pepper", "onion", "tomato sauce"] },
   { id: "m20", name: "Steam egg with minced beef", category: "main", protein: "beef", ingredients: ["egg", "minced beef"] },
-  { id: "m21", name: "Tomato and minced beef", category: "main", protein: "beef", ingredients: ["tomato", "minced beef", "onion"] },
+  { id: "m21", name: "Tomato and minced beef", category: "main", protein: "beef", ingredients: ["tomato", "minced beef", "onion"], onePerson: true },
   { id: "m22", name: "Braised beef ribs with potato and carrot in tomato sauce", category: "main", protein: "beef", ingredients: ["beef ribs", "potato", "carrot", "tomato sauce"] },
   { id: "m23", name: "Braised beef ribs with raddish", category: "main", protein: "beef", ingredients: ["beef ribs", "radish"] },
-  { id: "m24", name: "Japanese style pork slice with onion and egg", category: "main", protein: "pork", ingredients: ["pork slice", "onion", "egg"] },
-  { id: "m25", name: "Japanese style beef slice with onion and egg", category: "main", protein: "beef", ingredients: ["beef slice", "onion", "egg"] },
+  { id: "m24", name: "Japanese style pork slice with onion and egg", category: "main", protein: "pork", ingredients: ["pork slice", "onion", "egg"], onePerson: true },
+  { id: "m25", name: "Japanese style beef slice with onion and egg", category: "main", protein: "beef", ingredients: ["beef slice", "onion", "egg"], onePerson: true },
   { id: "m26", name: "Steak", category: "main", protein: "beef", ingredients: ["steak"] },
   { id: "m27", name: "Pan fried pork chop with white curry sauce", category: "main", protein: "pork", ingredients: ["pork chop", "white curry sauce", "lemongrass", "thai ginger", "lemon leaf", "onion", "coconut cream"] },
   { id: "m28", name: "Beef and Enoki mushroom rolls", category: "main", protein: "beef", ingredients: ["beef slice", "enoki mushroom"], remarks: "Cookbook p.92" },
@@ -44,8 +44,8 @@ const DEFAULT_DISHES = [
   { id: "m40", name: "Eggplant and minced pork", category: "main", protein: "pork", ingredients: ["eggplant", "minced pork", "coriander"] },
   { id: "m41", name: "Stir fry asparagus with pork slice", category: "main", protein: "pork", ingredients: ["asparagus", "pork slice"] },
   { id: "m42", name: "Pork ribs and pumpkin stew", category: "main", protein: "pork", ingredients: ["pork ribs", "pumpkin"] },
-  { id: "m43", name: "Ginger pork slice with fried rice", category: "main", protein: "pork", ingredients: ["pork slice", "ginger"], remarks: "Cookbook p.42" },
-  { id: "m44", name: "Nannban chicken", category: "main", protein: "chicken", ingredients: ["chicken thigh", "egg", "mayo"], remarks: "Cookbook p.98" },
+  { id: "m43", name: "Ginger pork slice with fried rice", category: "main", protein: "pork", ingredients: ["pork slice", "ginger"], remarks: "Cookbook p.42", onePerson: true },
+  { id: "m44", name: "Nannban chicken", category: "main", protein: "chicken", ingredients: ["chicken thigh", "egg", "mayo"], remarks: "Cookbook p.98", onePerson: true },
   { id: "m45", name: "Diced steak with cheese", category: "main", protein: "beef", ingredients: ["beef ribs", "cheese"], remarks: "Cookbook p.102" },
   { id: "m46", name: "Tomato and chicken with Balsamic sauce", category: "main", protein: "chicken", ingredients: ["chicken thigh", "cherry tomatoes", "garlic", "balsamic vinegar"], remarks: "Cookbook p.115" },
   { id: "m47", name: "Garlic butter squid", category: "main", protein: "seafood", ingredients: ["squid", "garlic", "butter"], remarks: "Cookbook p.26" },
@@ -65,7 +65,7 @@ const DEFAULT_DISHES = [
   { id: "s10", name: "Okura and tofu in sesame sauce", category: "side", protein: "none", ingredients: ["okra", "tofu", "sesame sauce"] },
   { id: "s11", name: "Stir fry egg with shrimps", category: "side", protein: "seafood", ingredients: ["egg", "shrimp"] },
   { id: "s12", name: "Stir fry egg with tomato", category: "side", protein: "none", ingredients: ["egg", "tomato"] },
-  { id: "s13", name: "Stir fry egg with Cha Siu", category: "side", protein: "pork", ingredients: ["egg", "cha siu"] },
+  { id: "s13", name: "Stir fry egg with Cha Siu", category: "side", protein: "pork", ingredients: ["egg", "cha siu"], onePerson: true },
   { id: "s14", name: "Pan fried tofu", category: "side", protein: "none", ingredients: ["tofu"] },
   { id: "s15", name: "Mixed vegetables and tofu in soup", category: "side", protein: "none", ingredients: ["mixed vegetables", "tofu"] },
   { id: "s16", name: "Oxtail soup in tomato with celery, carrot, onion, cabbage and potato", category: "side", protein: "beef", ingredients: ["oxtail", "tomato", "celery", "carrot", "onion", "cabbage", "potato"] },
@@ -102,7 +102,6 @@ const DEFAULT_DISHES = [
 // --- 2. HELPER FUNCTIONS ---
 const getRandomDish = (dishes) => dishes[Math.floor(Math.random() * dishes.length)];
 
-// Strips out text inside parentheses specifically for UI display
 const formatNameUI = (name) => name.replace(/\s*\(.*?\)/g, '');
 
 const getMasterIngredientList = (allDishes) => {
@@ -113,17 +112,13 @@ const getMasterIngredientList = (allDishes) => {
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
   
-  // Condiments
   if (lower.includes("rice paper") || lower.includes("scallion") || lower.includes("onion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
-  
-  // Proteins
   if (lower.includes("pork") || lower.includes("cha siu")) return "Pork";
   if (lower.includes("beef") || lower.includes("steak") || lower.includes("oxtail")) return "Beef";
   if (lower.includes("chicken")) return "Chicken";
   if (lower.includes("fish") || lower.includes("clam") || lower.includes("shrimp") || lower.includes("scallop") || lower.includes("pomfret") || lower.includes("halibut") || lower.includes("squid") || lower.includes("octopus") || lower.includes("salmon") || lower.includes("noodlefish")) return "Seafood";
   if (lower.includes("tofu") || lower.includes("soy")) return "Soy";
   
-  // Veggie Sub-categories!
   if (lower.includes("mushroom") || lower.includes("fungus")) return "Mushrooms";
   if (lower.includes("cabbage") || lower.includes("pak choi") || lower.includes("choi sum") || lower.includes("spinach") || lower.includes("lettuce")) return "Leafy Greens";
   if (lower.includes("potato") || lower.includes("carrot") || lower.includes("radish") || lower.includes("melon") || lower.includes("chayote") || lower.includes("pumpkin") || lower.includes("yam") || lower.includes("chestnut")) return "Root Veggies & Gourds";
@@ -134,13 +129,11 @@ const getIngredientCategory = (item) => {
 export default function DinnerApp() {
   // --- 3. STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState("planner"); 
-  const [diningSize, setDiningSize] = useState("medium");
-  const [largeFormat, setLargeFormat] = useState("1m2s"); // '1m2s' or '2m1s'
-  const [existingOnly, setExistingOnly] = useState(false);
+  const [diningSize, setDiningSize] = useState("medium"); // "one", "small", "medium", "large", "xlarge"
+  const [shoppingMode, setShoppingMode] = useState("any"); // "any", "minimal", "none"
   
-  // Custom Dishes State
   const [customDishes, setCustomDishes] = useState([]);
-  const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "" });
+  const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
   
   const [inventory, setInventory] = useState({});
@@ -194,7 +187,8 @@ export default function DinnerApp() {
       category: newDish.category,
       protein: newDish.protein,
       ingredients: newDish.ingredients,
-      remarks: newDish.remarks.trim()
+      remarks: newDish.remarks.trim(),
+      onePerson: newDish.onePerson
     };
     
     const updatedDishes = [...customDishes, dishToSave];
@@ -202,73 +196,92 @@ export default function DinnerApp() {
     localStorage.setItem("customDishes", JSON.stringify(updatedDishes));
     
     alert("Dish added successfully!");
-    setNewDish({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "" });
+    setNewDish({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "", onePerson: false });
   };
 
   const [mode, setMode] = useState("auto");
   const [generatedMenu, setGeneratedMenu] = useState(null);
-  
-  // Updated Manual Menu State to handle arrays of mains/sides
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
 
   // --- 4. LOGIC ---
   const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
 
-  const getValidDishes = () => {
-    if (!existingOnly) return allDishes;
-    return allDishes.filter((dish) =>
-      dish.ingredients.every((ing) => availableIngredientsList.includes(ing))
-    );
+  const getMissingIngredients = (menu) => {
+    let required = [];
+    if (menu.mains) menu.mains.forEach(m => { if(m) required.push(...m.ingredients); });
+    if (menu.sides) menu.sides.forEach(s => { if(s) required.push(...s.ingredients); });
+    if (menu.veg) required.push(...menu.veg.ingredients);
+    
+    const uniqueRequired = [...new Set(required)];
+    return uniqueRequired.filter(ing => !availableIngredientsList.includes(ing));
   };
 
   const handleAutoGenerate = () => {
-    const valid = getValidDishes();
-    const mains = valid.filter((d) => d.category === "main");
-    const sides = valid.filter((d) => d.category === "side");
-    const vegs = valid.filter((d) => d.category === "veg");
+    let bestMenu = null;
+    let minMissing = 999;
+    
+    // We try 100 times to generate a meal that fits the strict shopping rules
+    for(let attempts = 0; attempts < 100; attempts++) {
+        let usedProteins = [];
+        let tempMenu = { mains: [], sides: [], veg: null };
+        let isValid = true;
 
-    let usedProteins = [];
-    let newMenu = { mains: [], sides: [], veg: null };
+        if (diningSize === "one") {
+            const onePersonOptions = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+            if (onePersonOptions.length > 0) tempMenu.mains.push(getRandomDish(onePersonOptions));
+        } else {
+            const mains = allDishes.filter((d) => d.category === "main");
+            const sides = allDishes.filter((d) => d.category === "side");
+            const vegs = allDishes.filter((d) => d.category === "veg");
 
-    const numMains = (diningSize === "large" && largeFormat === "2m1s") ? 2 : 1;
-    const numSides = diningSize === "small" ? 0 : ((diningSize === "large" && largeFormat === "1m2s") ? 2 : 1);
+            const numMains = diningSize === "xlarge" ? 2 : 1;
+            const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
 
-    // Pick Mains
-    for (let i = 0; i < numMains; i++) {
-      const availableMains = mains.filter(m => !usedProteins.includes(m.protein) && !newMenu.mains.includes(m));
-      if (availableMains.length > 0) {
-        const picked = getRandomDish(availableMains);
-        newMenu.mains.push(picked);
-        if (picked.protein !== "none" && picked.protein !== "seafood") {
-          usedProteins.push(picked.protein);
+            for (let i = 0; i < numMains; i++) {
+                const availableMains = mains.filter(m => !usedProteins.includes(m.protein) && !tempMenu.mains.includes(m));
+                if (availableMains.length > 0) {
+                    const picked = getRandomDish(availableMains);
+                    tempMenu.mains.push(picked);
+                    if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
+                } else isValid = false;
+            }
+
+            for (let i = 0; i < numSides; i++) {
+                const availableSides = sides.filter(s => !usedProteins.includes(s.protein) && !tempMenu.sides.includes(s));
+                if (availableSides.length > 0) {
+                    const picked = getRandomDish(availableSides);
+                    tempMenu.sides.push(picked);
+                    if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
+                } else isValid = false;
+            }
+
+            const availableVegs = vegs.filter((v) => !usedProteins.includes(v.protein));
+            if (availableVegs.length > 0) tempMenu.veg = getRandomDish(availableVegs);
+            else isValid = false;
         }
-      }
-    }
 
-    // Pick Sides
-    for (let i = 0; i < numSides; i++) {
-      const availableSides = sides.filter(s => !usedProteins.includes(s.protein) && !newMenu.sides.includes(s));
-      if (availableSides.length > 0) {
-        const picked = getRandomDish(availableSides);
-        newMenu.sides.push(picked);
-        if (picked.protein !== "none" && picked.protein !== "seafood") {
-          usedProteins.push(picked.protein);
+        if (!isValid) continue;
+
+        const missingCount = getMissingIngredients(tempMenu).length;
+        
+        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) {
+            bestMenu = tempMenu;
+            break; // Perfect match found!
         }
-      }
+        
+        if (missingCount < minMissing) {
+            minMissing = missingCount;
+            bestMenu = tempMenu; // Keep as fallback
+        }
     }
 
-    // Pick Veg
-    const availableVegs = vegs.filter((v) => !usedProteins.includes(v.protein));
-    if (availableVegs.length > 0) {
-      newMenu.veg = getRandomDish(availableVegs);
+    if (shoppingMode !== "any" && minMissing > (shoppingMode === "none" ? 0 : 3)) {
+        alert(`We couldn't find a combo with your exact shopping preference. Here is the closest match! (Missing ${minMissing} items)`);
     }
 
-    setGeneratedMenu(newMenu);
+    setGeneratedMenu(bestMenu);
   };
 
-  const validForManual = getValidDishes();
-  
-  // Get options for a specific manual slot by excluding proteins selected in OTHER slots
   const getManualOptions = (type, indexToExclude) => {
     let used = [];
     manualMenu.mains.forEach((m, idx) => {
@@ -278,17 +291,28 @@ export default function DinnerApp() {
       if (s && !(type === 'side' && indexToExclude === idx) && s.protein !== "none" && s.protein !== "seafood") used.push(s.protein);
     });
 
-    return validForManual.filter(d => d.category === type && !used.includes(d.protein));
+    let pool = allDishes.filter(d => d.category === type && !used.includes(d.protein));
+
+    if (diningSize === "one") {
+      pool = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+    }
+
+    // Filter based on total shopping preference
+    return pool.filter(d => {
+       const simulatedMenu = { mains: [...manualMenu.mains], sides: [...manualMenu.sides], veg: manualMenu.veg };
+       if (type === 'main' || diningSize === 'one') simulatedMenu.mains[indexToExclude === -1 ? 0 : indexToExclude] = d;
+       else if (type === 'side') simulatedMenu.sides[indexToExclude] = d;
+       else if (type === 'veg') simulatedMenu.veg = d;
+       
+       const missingCount = getMissingIngredients(simulatedMenu).length;
+       if (shoppingMode === "none" && missingCount > 0) return false;
+       if (shoppingMode === "minimal" && missingCount > 3) return false;
+       return true;
+    });
   };
 
   const handleShare = (menuToShare) => {
-    let required = [];
-    if (menuToShare.mains) menuToShare.mains.forEach((m) => required.push(...m.ingredients));
-    if (menuToShare.sides) menuToShare.sides.forEach((s) => required.push(...s.ingredients));
-    if (menuToShare.veg) required.push(...menuToShare.veg.ingredients);
-
-    const uniqueRequired = [...new Set(required)];
-    const shoppingList = uniqueRequired.filter((ing) => !inventory[ing]);
+    const shoppingList = getMissingIngredients(menuToShare);
 
     let text = `*Tonight's Dinner*\n`;
     if (menuToShare.mains) menuToShare.mains.forEach((m) => (text += `• ${m.name}${m.remarks ? ` (${m.remarks})` : ""}\n`));
@@ -383,9 +407,8 @@ export default function DinnerApp() {
 
   const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Condiments"];
   
-  // Calculate how many sections to render based on dinner size setting
-  const numMains = (diningSize === "large" && largeFormat === "2m1s") ? 2 : 1;
-  const numSides = diningSize === "small" ? 0 : ((diningSize === "large" && largeFormat === "1m2s") ? 2 : 1);
+  const numMains = diningSize === "xlarge" ? 2 : 1;
+  const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
 
   return (
     <div style={styles.container}>
@@ -420,7 +443,6 @@ export default function DinnerApp() {
 
           <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Ingredients</label>
           
-          {/* Tag Pills for selected ingredients */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
             {newDish.ingredients.map(ing => (
               <span key={ing} style={{ background: "#FF8CA1", color: "white", padding: "6px 12px", borderRadius: "15px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold" }}>
@@ -430,7 +452,6 @@ export default function DinnerApp() {
             ))}
           </div>
 
-          {/* Autocomplete Input */}
           <input 
             style={{...styles.input, marginBottom: "0"}} 
             placeholder="Type an ingredient & press enter..." 
@@ -439,9 +460,7 @@ export default function DinnerApp() {
             onKeyDown={e => {
               if(e.key === 'Enter' && ingredientInput.trim()) {
                 const term = ingredientInput.trim().toLowerCase();
-                if(!newDish.ingredients.includes(term)) {
-                  setNewDish({...newDish, ingredients: [...newDish.ingredients, term]});
-                }
+                if(!newDish.ingredients.includes(term)) setNewDish({...newDish, ingredients: [...newDish.ingredients, term]});
                 setIngredientInput("");
               }
             }}
@@ -450,15 +469,12 @@ export default function DinnerApp() {
             <div style={{ border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", marginBottom: "15px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
               {masterIngredients.filter(i => i.includes(ingredientInput.toLowerCase())).slice(0, 5).map(sug => (
                 <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
-                  if(!newDish.ingredients.includes(sug)) {
-                    setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
-                  }
+                  if(!newDish.ingredients.includes(sug)) setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
                   setIngredientInput("");
                 }}>
                   {sug}
                 </div>
               ))}
-              {/* Option to add novel ingredient */}
               {!masterIngredients.includes(ingredientInput.trim().toLowerCase()) && (
                 <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
                   setNewDish({...newDish, ingredients: [...newDish.ingredients, ingredientInput.trim().toLowerCase()]});
@@ -473,6 +489,13 @@ export default function DinnerApp() {
           <div style={{marginTop: "15px"}}>
             <label style={{fontWeight: "bold", fontSize: "14px"}}>Remarks (Optional)</label>
             <input style={styles.input} placeholder="e.g. Cookbook p.92" value={newDish.remarks} onChange={e => setNewDish({...newDish, remarks: e.target.value})} />
+          </div>
+
+          <div style={{marginTop: "10px", marginBottom: "20px"}}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "500", fontSize: "14px" }}>
+              <input type="checkbox" checked={newDish.onePerson} onChange={(e) => setNewDish({...newDish, onePerson: e.target.checked})} style={{ width: "20px", height: "20px", accentColor: "#FF8CA1" }}/>
+              Great for One Person meals
+            </label>
           </div>
 
           <button style={styles.btn} onClick={handleAddDish}>Save Dish</button>
@@ -517,19 +540,22 @@ export default function DinnerApp() {
       {activeTab === "planner" && (
         <div>
           <div style={styles.block}>
-            <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px" }}>Dining Size:</label>
+            <label style={{ fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px", marginBottom: "10px", fontSize: "16px" }}>
+              🍴 Dining Size:
+            </label>
             <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
               {[
+                { id: "one", label: "One Person (1)" },
                 { id: "small", label: "Small (2)" },
                 { id: "medium", label: "Medium (3)" },
-                { id: "large", label: "Large (4)" }
+                { id: "large", label: "Large (3)" },
+                { id: "xlarge", label: "X-Large (4)" }
               ].map(size => (
                 <button 
                   key={size.id} 
                   style={styles.tag(diningSize === size.id)} 
                   onClick={() => {
                     setDiningSize(size.id);
-                    // Reset menu to prevent orphan selections when downsizing
                     setManualMenu({ mains: [], sides: [], veg: null });
                   }}
                 >
@@ -537,23 +563,14 @@ export default function DinnerApp() {
                 </button>
               ))}
             </div>
-
-            {/* Toggle for Large Dinners */}
-            {diningSize === "large" && (
-              <div style={{ marginTop: "15px", padding: "12px", background: "#fff", borderRadius: "12px", border: "1px solid #eee" }}>
-                 <label style={{ fontSize: "14px", fontWeight: "bold", color: "#666", display: "block", marginBottom: "8px" }}>Large Menu Format:</label>
-                 <div style={{ display: "flex", gap: "5px" }}>
-                   <button style={styles.tag(largeFormat === "1m2s")} onClick={() => {setLargeFormat("1m2s"); setManualMenu({ mains: [], sides: [], veg: null });}}>1 Main, 2 Sides</button>
-                   <button style={styles.tag(largeFormat === "2m1s")} onClick={() => {setLargeFormat("2m1s"); setManualMenu({ mains: [], sides: [], veg: null });}}>2 Mains, 1 Side</button>
-                 </div>
-              </div>
-            )}
             
             <div style={{ marginTop: "20px" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "500", fontSize: "14px" }}>
-                <input type="checkbox" checked={existingOnly} onChange={(e) => setExistingOnly(e.target.checked)} style={{ width: "20px", height: "20px", accentColor: "#FF8CA1" }}/>
-                Only use existing ingredients
-              </label>
+              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>🛒 Shopping Preference:</label>
+              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                <button style={styles.tag(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>Shop Normally</button>
+                <button style={styles.tag(shoppingMode === "minimal")} onClick={() => setShoppingMode("minimal")}>Minimal Shopping</button>
+                <button style={styles.tag(shoppingMode === "none")} onClick={() => setShoppingMode("none")}>No Shopping</button>
+              </div>
             </div>
           </div>
 
@@ -564,7 +581,7 @@ export default function DinnerApp() {
 
           {mode === "auto" && (
             <div>
-              <button style={styles.btn} onClick={handleAutoGenerate}>What's for dinner tonight?</button>
+              <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
               {generatedMenu && (
                 <div style={{...styles.block, marginTop: "20px"}}>
                   <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
@@ -607,36 +624,46 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
-              {/* Dynamic Main Slots */}
-              {[...Array(numMains)].map((_, i) => (
-                <div style={styles.block} key={`man-m-${i}`}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? i+1 : ''}</h3></div>
-                  {renderGroupedDishes(getManualOptions('main', i), (d) => {
-                     const newMains = [...manualMenu.mains];
-                     newMains[i] = d;
-                     setManualMenu({...manualMenu, mains: newMains});
-                  }, manualMenu.mains[i], false)}
+              {diningSize === "one" ? (
+                <div style={styles.block}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
+                  {renderGroupedDishes(getManualOptions('any', -1), (d) => {
+                     setManualMenu({ mains: [d], sides: [], veg: null });
+                  }, manualMenu.mains[0], false)}
                 </div>
-              ))}
+              ) : (
+                <>
+                  {[...Array(numMains)].map((_, i) => (
+                    <div style={styles.block} key={`man-m-${i}`}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? i+1 : ''}</h3></div>
+                      {renderGroupedDishes(getManualOptions('main', i), (d) => {
+                         const newMains = [...manualMenu.mains];
+                         newMains[i] = d;
+                         setManualMenu({...manualMenu, mains: newMains});
+                      }, manualMenu.mains[i], false)}
+                    </div>
+                  ))}
 
-              {/* Dynamic Side Slots */}
-              {[...Array(numSides)].map((_, i) => (
-                <div style={styles.block} key={`man-s-${i}`}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? i+1 : ''}</h3></div>
-                  {renderGroupedDishes(getManualOptions('side', i), (d) => {
-                     const newSides = [...manualMenu.sides];
-                     newSides[i] = d;
-                     setManualMenu({...manualMenu, sides: newSides});
-                  }, manualMenu.sides[i], true)}
-                </div>
-              ))}
+                  {[...Array(numSides)].map((_, i) => (
+                    <div style={styles.block} key={`man-s-${i}`}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? i+1 : ''}</h3></div>
+                      {renderGroupedDishes(getManualOptions('side', i), (d) => {
+                         const newSides = [...manualMenu.sides];
+                         newSides[i] = d;
+                         setManualMenu({...manualMenu, sides: newSides});
+                      }, manualMenu.sides[i], true)}
+                    </div>
+                  ))}
 
-              <div style={styles.block}>
-                <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
-                {renderGroupedDishes(getManualOptions('veg', -1), (d) => setManualMenu({...manualMenu, veg: d}), manualMenu.veg, false)}
-              </div>
+                  <div style={styles.block}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
+                    {renderGroupedDishes(getManualOptions('veg', -1), (d) => setManualMenu({...manualMenu, veg: d}), manualMenu.veg, false)}
+                  </div>
+                </>
+              )}
 
-              {(manualMenu.mains.length === numMains && !manualMenu.mains.includes(undefined) && manualMenu.veg && (manualMenu.sides.length === numSides && !manualMenu.sides.includes(undefined))) && (
+              {((diningSize === "one" && manualMenu.mains[0]) || 
+                (diningSize !== "one" && manualMenu.mains.length === numMains && !manualMenu.mains.includes(undefined) && manualMenu.veg && (manualMenu.sides.length === numSides && !manualMenu.sides.includes(undefined)))) && (
                 <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginBottom: "30px"}} onClick={() => handleShare(manualMenu)}>Send to WhatsApp</button>
               )}
             </div>
