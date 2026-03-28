@@ -2,15 +2,15 @@ import React, { useState, useEffect, useMemo } from "react";
 
 // --- 1. OUR DATABASE ---
 const DEFAULT_DISHES = [
-  { id: "m1", name: "Dumplings in two types (Chinese chive and minced pork, Chinese celery, Chinese mushroom and minced pork)", category: "main", protein: "pork", ingredients: ["dumpling skin", "minced pork", "Chinese chive", "Chinese celery", "Chinese mushroom"], onePerson: true },
-  { id: "m2", name: "Rice in winter melon, minced pork, Chinese mushroom, Coriander soup", category: "main", protein: "pork", ingredients: ["winter melon", "minced pork", "Chinese mushroom", "coriander"], onePerson: true },
+  { id: "m1", name: "Dumplings in two types (Chinese chive and minced pork, Chinese celery, Chinese mushroom and minced pork)", category: "main", protein: "pork", ingredients: ["dumpling skin", "minced pork", "chinese chive", "chinese celery", "chinese mushroom"], onePerson: true },
+  { id: "m2", name: "Rice in winter melon, minced pork, Chinese mushroom, Coriander soup", category: "main", protein: "pork", ingredients: ["winter melon", "minced pork", "chinese mushroom", "coriander"], onePerson: true },
   { id: "m3", name: "Steam shrimps with garlic and vermicelli", category: "main", protein: "seafood", ingredients: ["fresh shrimp", "garlic", "vermicelli"] },
   { id: "m4", name: "Pork ribs and chestnut stew", category: "main", protein: "pork", ingredients: ["pork ribs", "chestnut"] },
-  { id: "m5", name: "Apple and pork rolls", category: "main", protein: "pork", ingredients: ["pork slices", "apple"] },
-  { id: "m6", name: "Whole chicken thigh with apple, onion and Chinese cabbage", category: "main", protein: "chicken", ingredients: ["whole chicken thigh", "apple", "onion", "Chinese cabbage"] },
+  { id: "m5", name: "Apple and pork rolls", category: "main", protein: "pork", ingredients: ["pork slice", "apple"] },
+  { id: "m6", name: "Whole chicken thigh with apple, onion and Chinese cabbage", category: "main", protein: "chicken", ingredients: ["whole chicken thigh", "apple", "onion", "chinese cabbage"] },
   { id: "m7", name: "Chicken curry with onion, bell pepper, potato and carrot", category: "main", protein: "chicken", ingredients: ["chicken thigh", "curry powder", "onion", "bell pepper", "potato", "carrot", "coconut cream"], onePerson: true },
   { id: "m8", name: "Roasted whole pork ribs", category: "main", protein: "pork", ingredients: ["whole pork ribs", "tomato sauce", "black pepper sauce"] },
-  { id: "m9", name: "Stir fry chicken thigh with Chinese mushroom, cashew and ginger", category: "main", protein: "chicken", ingredients: ["chicken thigh", "Chinese mushroom", "cashew", "ginger"] },
+  { id: "m9", name: "Stir fry chicken thigh with Chinese mushroom, cashew and ginger", category: "main", protein: "chicken", ingredients: ["chicken thigh", "chinese mushroom", "cashew", "ginger"] },
   { id: "m10", name: "Stir fry pork slice with mushroom", category: "main", protein: "pork", ingredients: ["pork slice", "mushroom"] },
   { id: "m11", name: "Stir fry chicken thigh with celery and cashew", category: "main", protein: "chicken", ingredients: ["chicken thigh", "celery", "cashew"] },
   { id: "m12", name: "Stir fry chicken thigh with king mushroom", category: "main", protein: "chicken", ingredients: ["chicken thigh", "king mushroom"] },
@@ -19,7 +19,7 @@ const DEFAULT_DISHES = [
   { id: "m15", name: "Chicken wing and potato stew", category: "main", protein: "chicken", ingredients: ["chicken wings", "potato"] },
   { id: "m16", name: "Pork ribs and potato stew", category: "main", protein: "pork", ingredients: ["pork ribs", "potato"] },
   { id: "m17", name: "Salmon steak", category: "main", protein: "seafood", ingredients: ["salmon steak"] },
-  { id: "m18", name: "Salmon with tofu, onion, Chinese cabbage, leak and Shimeji miso soymilk stew", category: "main", protein: "seafood", ingredients: ["salmon", "tofu", "onion", "Chinese cabbage", "leek", "shimeji mushroom", "miso", "soy milk"] },
+  { id: "m18", name: "Salmon with tofu, onion, Chinese cabbage, leak and Shimeji miso soymilk stew", category: "main", protein: "seafood", ingredients: ["salmon", "tofu", "onion", "chinese cabbage", "leek", "shimeji mushroom", "miso", "soy milk"] },
   { id: "m19", name: "Salmon steak with sweet and sour sauce", category: "main", protein: "seafood", ingredients: ["salmon steak", "bell pepper", "onion", "tomato sauce"] },
   { id: "m20", name: "Steam egg with minced beef", category: "main", protein: "beef", ingredients: ["egg", "minced beef"] },
   { id: "m21", name: "Tomato and minced beef", category: "main", protein: "beef", ingredients: ["tomato", "minced beef", "onion"], onePerson: true },
@@ -102,6 +102,7 @@ const DEFAULT_DISHES = [
 // --- 2. HELPER FUNCTIONS ---
 const getRandomDish = (dishes) => dishes[Math.floor(Math.random() * dishes.length)];
 
+// Scrubs out text in parentheses for clean UI display
 const formatNameUI = (name) => name.replace(/\s*\(.*?\)/g, '');
 
 const getMasterIngredientList = (allDishes) => {
@@ -112,7 +113,7 @@ const getMasterIngredientList = (allDishes) => {
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
   
-  if (lower.includes("rice paper") || lower.includes("scallion") || lower.includes("onion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
+  if (lower.includes("rice paper") || lower.includes("dumpling skin") || lower.includes("peanut") || lower.includes("scallion") || lower.includes("onion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
   if (lower.includes("pork") || lower.includes("cha siu")) return "Pork";
   if (lower.includes("beef") || lower.includes("steak") || lower.includes("oxtail")) return "Beef";
   if (lower.includes("chicken")) return "Chicken";
@@ -120,8 +121,8 @@ const getIngredientCategory = (item) => {
   if (lower.includes("tofu") || lower.includes("soy")) return "Soy";
   
   if (lower.includes("mushroom") || lower.includes("fungus")) return "Mushrooms";
-  if (lower.includes("cabbage") || lower.includes("pak choi") || lower.includes("choi sum") || lower.includes("spinach") || lower.includes("lettuce")) return "Leafy Greens";
-  if (lower.includes("potato") || lower.includes("carrot") || lower.includes("radish") || lower.includes("melon") || lower.includes("chayote") || lower.includes("pumpkin") || lower.includes("yam") || lower.includes("chestnut")) return "Root Veggies & Gourds";
+  if (lower.includes("cabbage") || lower.includes("pak choi") || lower.includes("choi sum") || lower.includes("spinach") || lower.includes("lettuce") || lower.includes("green sprout")) return "Leafy Greens";
+  if (lower.includes("potato") || lower.includes("carrot") || lower.includes("radish") || lower.includes("melon") || lower.includes("chayote") || lower.includes("pumpkin") || lower.includes("yam") || lower.includes("chestnut") || lower.includes("eggplant") || lower.includes("lotus") || lower.includes("corn")) return "Root Veggies & Gourds";
   
   return "Other Veggies"; 
 };
@@ -130,10 +131,10 @@ export default function DinnerApp() {
   // --- 3. STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState("planner"); 
   const [diningSize, setDiningSize] = useState("medium"); // "one", "small", "medium", "large", "xlarge"
-  const [shoppingMode, setShoppingMode] = useState("any"); // "any", "minimal", "none"
+  const [shoppingMode, setShoppingMode] = useState("any"); 
   
   const [customDishes, setCustomDishes] = useState([]);
-  const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "", onePerson: false });
+  const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
   
   const [inventory, setInventory] = useState({});
@@ -185,7 +186,7 @@ export default function DinnerApp() {
       id: "c_" + Date.now(),
       name: newDish.name,
       category: newDish.category,
-      protein: newDish.protein,
+      protein: newDish.protein || "none", // Defaults to none if left unselected
       ingredients: newDish.ingredients,
       remarks: newDish.remarks.trim(),
       onePerson: newDish.onePerson
@@ -196,11 +197,13 @@ export default function DinnerApp() {
     localStorage.setItem("customDishes", JSON.stringify(updatedDishes));
     
     alert("Dish added successfully!");
-    setNewDish({ name: "", category: "main", protein: "pork", ingredients: [], remarks: "", onePerson: false });
+    setNewDish({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   };
 
   const [mode, setMode] = useState("auto");
   const [generatedMenu, setGeneratedMenu] = useState(null);
+  
+  // Arrays for multi-select
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
 
   // --- 4. LOGIC ---
@@ -266,13 +269,11 @@ export default function DinnerApp() {
 
         const missingCount = getMissingIngredients(tempMenu).length;
         
-        // Always track the best combination we've found so far
         if (missingCount < bestMissingCount) {
             bestMissingCount = missingCount;
             bestMenu = tempMenu;
         }
         
-        // If we found a combo that perfectly satisfies the user's rules, stop searching immediately!
         if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) {
             break; 
         }
@@ -288,33 +289,74 @@ export default function DinnerApp() {
     }
   };
 
-  const getManualOptions = (type, indexToExclude) => {
-    let used = [];
-    manualMenu.mains.forEach((m, idx) => {
-      if (m && !(type === 'main' && indexToExclude === idx) && m.protein !== "none" && m.protein !== "seafood") used.push(m.protein);
-    });
-    manualMenu.sides.forEach((s, idx) => {
-      if (s && !(type === 'side' && indexToExclude === idx) && s.protein !== "none" && s.protein !== "seafood") used.push(s.protein);
-    });
+  const getManualOptions = (type) => {
+    let usedOther = [];
+    let usedSelf = [];
 
-    let pool = allDishes.filter(d => d.category === type && !used.includes(d.protein));
-
-    if (diningSize === "one") {
-      pool = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+    if (type === 'main') {
+      manualMenu.sides.forEach(s => { if(s && s.protein !== "none" && s.protein !== "seafood") usedOther.push(s.protein); });
+      manualMenu.mains.forEach(m => { if(m && m.protein !== "none" && m.protein !== "seafood") usedSelf.push(m.protein); });
+    } else if (type === 'side') {
+      manualMenu.mains.forEach(m => { if(m && m.protein !== "none" && m.protein !== "seafood") usedOther.push(m.protein); });
+      manualMenu.sides.forEach(s => { if(s && s.protein !== "none" && s.protein !== "seafood") usedSelf.push(s.protein); });
+    } else if (type === 'veg') {
+      manualMenu.mains.forEach(m => { if(m && m.protein !== "none" && m.protein !== "seafood") usedOther.push(m.protein); });
+      manualMenu.sides.forEach(s => { if(s && s.protein !== "none" && s.protein !== "seafood") usedOther.push(s.protein); });
     }
 
-    // Filter based on total shopping preference
+    let pool = allDishes.filter(d => d.category === type);
+    if (diningSize === "one") pool = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+
     return pool.filter(d => {
+       // 1. Cannot pick a protein used by another category entirely
+       if (usedOther.includes(d.protein)) return false;
+       
+       // 2. Cannot pick a protein already used in THIS category, UNLESS it's already selected (so we can unselect it)
+       const isSelectedSelf = (type === 'main' && manualMenu.mains.find(m => m.id === d.id)) ||
+                              (type === 'side' && manualMenu.sides.find(s => s.id === d.id)) ||
+                              (type === 'veg' && manualMenu.veg?.id === d.id);
+                              
+       if (!isSelectedSelf && usedSelf.includes(d.protein)) return false;
+
+       // 3. Shopping limits check
        const simulatedMenu = { mains: [...manualMenu.mains], sides: [...manualMenu.sides], veg: manualMenu.veg };
-       if (type === 'main' || diningSize === 'one') simulatedMenu.mains[indexToExclude === -1 ? 0 : indexToExclude] = d;
-       else if (type === 'side') simulatedMenu.sides[indexToExclude] = d;
-       else if (type === 'veg') simulatedMenu.veg = d;
+       if (type === 'main' || diningSize === 'one') {
+           if (!isSelectedSelf) {
+               if (simulatedMenu.mains.length < (diningSize === "xlarge" ? 2 : 1)) simulatedMenu.mains.push(d);
+               else simulatedMenu.mains[0] = d; 
+           }
+       } else if (type === 'side') {
+           if (!isSelectedSelf) {
+               if (simulatedMenu.sides.length < (diningSize === "large" ? 2 : 1)) simulatedMenu.sides.push(d);
+               else simulatedMenu.sides[0] = d;
+           }
+       } else if (type === 'veg') {
+           simulatedMenu.veg = d;
+       }
        
        const missingCount = getMissingIngredients(simulatedMenu).length;
        if (shoppingMode === "none" && missingCount > 0) return false;
        if (shoppingMode === "minimal" && missingCount > 3) return false;
        return true;
     });
+  };
+
+  const toggleManualSelection = (type, dish, maxLimit) => {
+    if (type === 'veg') {
+      setManualMenu({...manualMenu, veg: manualMenu.veg?.id === dish.id ? null : dish});
+      return;
+    }
+
+    let current = [...manualMenu[type]];
+    const index = current.findIndex(item => item && item.id === dish.id);
+    
+    if (index >= 0) {
+      current.splice(index, 1); // Deselect
+    } else {
+      if (current.length >= maxLimit) current.shift(); // Remove oldest to make room
+      current.push(dish); // Select
+    }
+    setManualMenu({...manualMenu, [type]: current});
   };
 
   const handleShare = (menuToShare) => {
@@ -339,7 +381,8 @@ export default function DinnerApp() {
     nav: { display: "flex", gap: "8px", marginBottom: "20px", overflowX: "auto", paddingBottom: "5px" },
     tag: (isActive) => ({
       padding: "10px 16px", borderRadius: "20px", border: "1.5px solid #FF8CA1", fontSize: "14px",
-      background: isActive ? "#FF8CA1" : "transparent", fontWeight: "600", whiteSpace: "nowrap",
+      background: isActive ? "#FF8CA1" : "transparent", fontWeight: "600", 
+      whiteSpace: "normal", wordBreak: "break-word", textAlign: "left", height: "auto", // Fixes long text overflow!
       color: isActive ? "white" : "#FF8CA1", cursor: "pointer", margin: "5px 5px 5px 0"
     }),
     block: { marginBottom: "20px", padding: "20px", background: "#f9f9f9", borderRadius: "16px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" },
@@ -356,23 +399,19 @@ export default function DinnerApp() {
 
     return (
       <div style={{ 
-        width: "64px", height: "64px", 
-        borderRadius: "16px", 
-        backgroundColor: bgColor, 
-        display: "flex", alignItems: "center", justifyContent: "center", 
-        fontSize: "44px", 
-        flexShrink: 0 
+        width: "64px", height: "64px", borderRadius: "16px", backgroundColor: bgColor, 
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: "44px", flexShrink: 0 
       }}>
         {emoji}
       </div>
     );
   };
 
-  const renderGroupedDishes = (dishes, onSelect, selectedItem, isSide = false) => {
+  const renderGroupedDishesMulti = (dishes, selectedItemsArray, isSide = false, onSelect) => {
     const defaultGroups = [
       { id: "pork", label: "Pork" }, { id: "beef", label: "Beef" }, 
       { id: "chicken", label: "Chicken" }, { id: "seafood", label: "Seafood" }, 
-      { id: "none", label: "Veg/Other" }
+      { id: "soy", label: "Soy" }, { id: "none", label: "Veg/Other" }
     ];
     
     const sideGroups = [
@@ -400,11 +439,15 @@ export default function DinnerApp() {
         <div key={group.id}>
           <div style={styles.categoryHeader}>{group.label}</div>
           <div style={{ display: "flex", flexWrap: "wrap" }}>
-            {filtered.map(d => (
-              <button key={d.id} style={styles.tag(selectedItem?.id === d.id)} onClick={() => onSelect(d)}>
-                {formatNameUI(d.name)}
-              </button>
-            ))}
+            {filtered.map(d => {
+              // Check if THIS specific dish is selected
+              const isSelected = selectedItemsArray.some(item => item && item.id === d.id);
+              return (
+                <button key={d.id} style={styles.tag(isSelected)} onClick={() => onSelect(d)}>
+                  {formatNameUI(d.name)}
+                </button>
+              );
+            })}
           </div>
         </div>
       );
@@ -440,10 +483,10 @@ export default function DinnerApp() {
             ))}
           </div>
 
-          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Main Protein</label>
+          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Main Protein (Optional)</label>
           <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
-            {["pork", "beef", "chicken", "seafood", "none"].map(pro => (
-              <button key={pro} style={styles.tag(newDish.protein === pro)} onClick={() => setNewDish({...newDish, protein: pro})}>{pro.toUpperCase()}</button>
+            {["pork", "beef", "chicken", "seafood", "soy"].map(pro => (
+              <button key={pro} style={styles.tag(newDish.protein === pro)} onClick={() => setNewDish({...newDish, protein: newDish.protein === pro ? "" : pro})}>{pro.toUpperCase()}</button>
             ))}
           </div>
 
@@ -551,7 +594,7 @@ export default function DinnerApp() {
             </label>
             <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
               {[
-                { id: "one", label: "One Person (1)" },
+                { id: "one", label: "Single (1)" },
                 { id: "small", label: "Small (2)" },
                 { id: "medium", label: "Medium (3)" },
                 { id: "large", label: "Large (3)" },
@@ -581,8 +624,8 @@ export default function DinnerApp() {
           </div>
 
           <div style={{...styles.nav, borderBottom: "2px solid #eee", paddingBottom: "15px"}}>
-            <button style={{...styles.tag(mode === "auto"), flex: 1}} onClick={() => setMode("auto")}>Surprise me</button>
-            <button style={{...styles.tag(mode === "manual"), flex: 1}} onClick={() => setMode("manual")}>Let me think</button>
+            <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>Surprise me</button>
+            <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => setMode("manual")}>Let me think</button>
           </div>
 
           {mode === "auto" && (
@@ -595,30 +638,21 @@ export default function DinnerApp() {
                   {generatedMenu.mains.map((m, i) => (
                     <div style={styles.menuCard} key={`auto-m-${i}`}>
                       <DishIcon type="main" />
-                      <div>
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
-                        {m.remarks && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{m.remarks}</div>}
-                      </div>
+                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
                     </div>
                   ))}
                   
                   {generatedMenu.sides.map((s, i) => (
                     <div style={styles.menuCard} key={`auto-s-${i}`}>
                       <DishIcon type="side" />
-                      <div>
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
-                        {s.remarks && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{s.remarks}</div>}
-                      </div>
+                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
                     </div>
                   ))}
 
                   {generatedMenu.veg && (
                     <div style={{...styles.menuCard, borderBottom: "none"}}>
                       <DishIcon type="veg" />
-                      <div>
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
-                        {generatedMenu.veg.remarks && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>{generatedMenu.veg.remarks}</div>}
-                      </div>
+                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
                     </div>
                   )}
 
@@ -632,44 +666,32 @@ export default function DinnerApp() {
             <div>
               {diningSize === "one" ? (
                 <div style={styles.block}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
-                  {renderGroupedDishes(getManualOptions('any', -1), (d) => {
-                     setManualMenu({ mains: [d], sides: [], veg: null });
-                  }, manualMenu.mains[0], false)}
+                  <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
+                  {renderGroupedDishesMulti(getManualOptions('any'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, 1))}
                 </div>
               ) : (
                 <>
-                  {[...Array(numMains)].map((_, i) => (
-                    <div style={styles.block} key={`man-m-${i}`}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? i+1 : ''}</h3></div>
-                      {renderGroupedDishes(getManualOptions('main', i), (d) => {
-                         const newMains = [...manualMenu.mains];
-                         newMains[i] = d;
-                         setManualMenu({...manualMenu, mains: newMains});
-                      }, manualMenu.mains[i], false)}
-                    </div>
-                  ))}
+                  <div style={styles.block}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? `(Pick ${numMains})` : ''}</h3></div>
+                    {renderGroupedDishesMulti(getManualOptions('main'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))}
+                  </div>
 
-                  {[...Array(numSides)].map((_, i) => (
-                    <div style={styles.block} key={`man-s-${i}`}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? i+1 : ''}</h3></div>
-                      {renderGroupedDishes(getManualOptions('side', i), (d) => {
-                         const newSides = [...manualMenu.sides];
-                         newSides[i] = d;
-                         setManualMenu({...manualMenu, sides: newSides});
-                      }, manualMenu.sides[i], true)}
+                  {numSides > 0 && (
+                    <div style={styles.block}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
+                      {renderGroupedDishesMulti(getManualOptions('side'), manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))}
                     </div>
-                  ))}
+                  )}
 
                   <div style={styles.block}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
-                    {renderGroupedDishes(getManualOptions('veg', -1), (d) => setManualMenu({...manualMenu, veg: d}), manualMenu.veg, false)}
+                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
+                    {renderGroupedDishesMulti(getManualOptions('veg'), [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))}
                   </div>
                 </>
               )}
 
-              {((diningSize === "one" && manualMenu.mains[0]) || 
-                (diningSize !== "one" && manualMenu.mains.length === numMains && !manualMenu.mains.includes(undefined) && manualMenu.veg && (manualMenu.sides.length === numSides && !manualMenu.sides.includes(undefined)))) && (
+              {((diningSize === "one" && manualMenu.mains.length === 1) || 
+                (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
                 <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginBottom: "30px"}} onClick={() => handleShare(manualMenu)}>Send to WhatsApp</button>
               )}
             </div>
