@@ -218,9 +218,8 @@ export default function DinnerApp() {
 
   const handleAutoGenerate = () => {
     let bestMenu = null;
-    let minMissing = 999;
+    let bestMissingCount = 999;
     
-    // We try 100 times to generate a meal that fits the strict shopping rules
     for(let attempts = 0; attempts < 100; attempts++) {
         let usedProteins = [];
         let tempMenu = { mains: [], sides: [], veg: null };
@@ -228,7 +227,9 @@ export default function DinnerApp() {
 
         if (diningSize === "one") {
             const onePersonOptions = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
-            if (onePersonOptions.length > 0) tempMenu.mains.push(getRandomDish(onePersonOptions));
+            if (onePersonOptions.length > 0) {
+              tempMenu.mains.push(getRandomDish(onePersonOptions));
+            } else isValid = false;
         } else {
             const mains = allDishes.filter((d) => d.category === "main");
             const sides = allDishes.filter((d) => d.category === "side");
@@ -256,30 +257,35 @@ export default function DinnerApp() {
             }
 
             const availableVegs = vegs.filter((v) => !usedProteins.includes(v.protein));
-            if (availableVegs.length > 0) tempMenu.veg = getRandomDish(availableVegs);
-            else isValid = false;
+            if (availableVegs.length > 0) {
+              tempMenu.veg = getRandomDish(availableVegs);
+            } else isValid = false;
         }
 
         if (!isValid) continue;
 
         const missingCount = getMissingIngredients(tempMenu).length;
         
-        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) {
+        // Always track the best combination we've found so far
+        if (missingCount < bestMissingCount) {
+            bestMissingCount = missingCount;
             bestMenu = tempMenu;
-            break; // Perfect match found!
         }
         
-        if (missingCount < minMissing) {
-            minMissing = missingCount;
-            bestMenu = tempMenu; // Keep as fallback
+        // If we found a combo that perfectly satisfies the user's rules, stop searching immediately!
+        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) {
+            break; 
         }
     }
 
-    if (shoppingMode !== "any" && minMissing > (shoppingMode === "none" ? 0 : 3)) {
-        alert(`We couldn't find a combo with your exact shopping preference. Here is the closest match! (Missing ${minMissing} items)`);
+    if (bestMenu) {
+      if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
+          alert(`We couldn't find a combo with your exact shopping preference. Here is the closest match! (Missing ${bestMissingCount} items)`);
+      }
+      setGeneratedMenu(bestMenu);
+    } else {
+      alert("We couldn't generate a valid menu. Try changing your dining size or adding more dishes!");
     }
-
-    setGeneratedMenu(bestMenu);
   };
 
   const getManualOptions = (type, indexToExclude) => {
