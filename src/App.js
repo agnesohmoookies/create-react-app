@@ -115,17 +115,28 @@ const getMasterIngredientList = (allDishes) => {
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
   
-  if (lower.includes("rice paper") || lower.includes("dumpling skin") || lower.includes("peanut") || lower.includes("scallion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
-  if (lower.includes("pork") || lower.includes("cha siu")) return "Pork";
-  if (lower.includes("beef") || lower.includes("steak") || lower.includes("oxtail")) return "Beef";
-  if (lower.includes("chicken")) return "Chicken";
-  if (lower.includes("fish") || lower.includes("clam") || lower.includes("shrimp") || lower.includes("scallop") || lower.includes("pomfret") || lower.includes("halibut") || lower.includes("squid") || lower.includes("octopus") || lower.includes("salmon") || lower.includes("noodlefish")) return "Seafood";
-  if (lower.includes("tofu") || lower.includes("soy")) return "Soy";
-  
-  if (lower.includes("mushroom") || lower.includes("fungus")) return "Mushrooms";
-  if (lower.includes("cabbage") || lower.includes("pak choi") || lower.includes("choi sum") || lower.includes("spinach") || lower.includes("lettuce") || lower.includes("green sprout")) return "Leafy Greens";
-  if (lower.includes("potato") || lower.includes("carrot") || lower.includes("radish") || lower.includes("onion") || lower.includes("melon") || lower.includes("chayote") || lower.includes("pumpkin") || lower.includes("yam") || lower.includes("chestnut") || lower.includes("eggplant") || lower.includes("lotus") || lower.includes("corn")) return "Root Veggies & Gourds";
-  
+  // Smart Regex Bouncer: Checks for whole words and their plural forms (e.g., "egg" or "eggs"), 
+  // but prevents partial matches (like "egg" triggering on "eggplant").
+  const hasWord = (words) => new RegExp(`\\b(${words.join('|')})(s|es)?\\b`, 'i').test(lower);
+
+  // 1. SPECIFIC MULTI-WORD PHRASES (Must be checked first!)
+  if (hasWord(["spring onion"])) return "Condiments";
+
+  // 2. PROTEINS
+  if (hasWord(["pork", "cha siu"])) return "Pork";
+  if (hasWord(["beef", "steak", "oxtail"])) return "Beef";
+  if (hasWord(["chicken"])) return "Chicken";
+  if (hasWord(["fish", "clam", "shrimp", "scallop", "pomfret", "halibut", "squid", "octopus", "salmon", "noodlefish"])) return "Seafood";
+  if (hasWord(["tofu", "soy"])) return "Soy";
+
+  // 3. VEGGIES
+  if (hasWord(["mushroom", "fungus"])) return "Mushrooms";
+  if (hasWord(["cabbage", "pak choi", "choi sum", "spinach", "lettuce", "sprout"])) return "Leafy Greens";
+  if (hasWord(["potato", "carrot", "radish", "melon", "chayote", "pumpkin", "yam", "chestnut", "lotus", "corn", "onion", "eggplant"])) return "Root Veggies & Gourds";
+
+  // 4. CONDIMENTS
+  if (hasWord(["rice paper", "dumpling skin", "peanut", "scallion", "curry", "coconut", "garlic", "ginger", "lemon", "osmanthus", "vermicelli", "cashew", "egg", "sauce", "butter", "salt", "mayo", "mayonnaise", "miso", "cheese", "vinegar", "coriander"])) return "Condiments";
+
   return "Other Veggies"; 
 };
 
@@ -161,7 +172,6 @@ export default function DinnerApp() {
         let merged = { ...cloudData };
         let changed = false;
         
-        // Ensure new ingredients from code are added
         masterIngredients.forEach(item => {
           if (merged[item] === undefined) {
             merged[item] = true; 
@@ -169,7 +179,6 @@ export default function DinnerApp() {
           }
         });
 
-        // Convert strings from sheets back to booleans if needed
         for(let key in merged) {
             if(merged[key] === "FALSE" || merged[key] === "false" || merged[key] === false) merged[key] = false;
             else merged[key] = true;
@@ -178,7 +187,6 @@ export default function DinnerApp() {
         setInventory(merged);
         setInventoryLoading(false);
 
-        // VIP Pass: Upload merged items back to sheet using mode: "no-cors"
         if (changed) {
           fetch(SCRIPT_URL, {
             method: "POST",
@@ -204,13 +212,11 @@ export default function DinnerApp() {
     loadCloudInventory();
   }, [masterIngredients]);
 
-  // Handle inventory toggles
   const toggleIngredient = (item) => {
     const updated = { ...inventory, [item]: !inventory[item] };
-    setInventory(updated); // Optimistic UI update
+    setInventory(updated); 
     localStorage.setItem("dinnerInventory", JSON.stringify(updated)); 
     
-    // VIP Pass: Save to Cloud using mode: "no-cors"
     fetch(SCRIPT_URL, {
       method: "POST",
       mode: "no-cors",
