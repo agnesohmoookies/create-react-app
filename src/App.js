@@ -509,4 +509,236 @@ export default function DinnerApp() {
           <label style={{fontWeight: "bold", fontSize: "14px"}}>Dish Name</label>
           <input style={styles.input} placeholder="e.g. Tomato Egg Stir Fry" value={newDish.name} onChange={e => setNewDish({...newDish, name: e.target.value})} />
 
-          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "
+          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Category</label>
+          <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
+            {["main", "side", "veg"].map(cat => (
+              <button key={cat} style={styles.tag(newDish.category === cat)} onClick={() => setNewDish({...newDish, category: cat})}>{cat.toUpperCase()}</button>
+            ))}
+          </div>
+
+          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Main Protein (Optional)</label>
+          <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
+            {["pork", "beef", "chicken", "seafood", "soy"].map(pro => (
+              <button key={pro} style={styles.tag(newDish.protein === pro)} onClick={() => setNewDish({...newDish, protein: newDish.protein === pro ? "" : pro})}>{pro.toUpperCase()}</button>
+            ))}
+          </div>
+
+          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Ingredients</label>
+          
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
+            {newDish.ingredients.map(ing => (
+              <span key={ing} style={{ background: "#FF8CA1", color: "white", padding: "6px 12px", borderRadius: "15px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold" }}>
+                {ing} 
+                <button style={{ border: "none", background: "none", cursor: "pointer", color: "white", padding: 0, fontWeight: "bold", fontSize: "16px" }} onClick={() => setNewDish({...newDish, ingredients: newDish.ingredients.filter(i => i !== ing)})}>×</button>
+              </span>
+            ))}
+          </div>
+
+          <input 
+            style={{...styles.input, marginBottom: "0"}} 
+            placeholder="Type an ingredient & press enter..." 
+            value={ingredientInput} 
+            onChange={e => setIngredientInput(e.target.value)}
+            onKeyDown={e => {
+              if(e.key === 'Enter' && ingredientInput.trim()) {
+                const term = ingredientInput.trim().toLowerCase();
+                if(!newDish.ingredients.includes(term)) setNewDish({...newDish, ingredients: [...newDish.ingredients, term]});
+                setIngredientInput("");
+              }
+            }}
+          />
+          {ingredientInput && (
+            <div style={{ border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", marginBottom: "15px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
+              {masterIngredients.filter(i => i.includes(ingredientInput.toLowerCase())).slice(0, 5).map(sug => (
+                <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
+                  if(!newDish.ingredients.includes(sug)) setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
+                  setIngredientInput("");
+                }}>
+                  {sug}
+                </div>
+              ))}
+              {!masterIngredients.includes(ingredientInput.trim().toLowerCase()) && (
+                <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
+                  setNewDish({...newDish, ingredients: [...newDish.ingredients, ingredientInput.trim().toLowerCase()]});
+                  setIngredientInput("");
+                }}>
+                  + Add new: "{ingredientInput}"
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{marginTop: "15px"}}>
+            <label style={{fontWeight: "bold", fontSize: "14px"}}>Remarks (Optional)</label>
+            <input style={styles.input} placeholder="e.g. Cookbook p.92" value={newDish.remarks} onChange={e => setNewDish({...newDish, remarks: e.target.value})} />
+          </div>
+
+          <div style={{marginTop: "10px", marginBottom: "20px"}}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "500", fontSize: "14px" }}>
+              <input type="checkbox" checked={newDish.onePerson} onChange={(e) => setNewDish({...newDish, onePerson: e.target.checked})} style={{ width: "20px", height: "20px", accentColor: "#FF8CA1" }}/>
+              Great for One Person meals
+            </label>
+          </div>
+
+          <button style={styles.btn} onClick={handleAddDish}>Save Dish</button>
+        </div>
+      )}
+
+      {activeTab === "inventory" && (
+        <div style={{ position: "relative" }}>
+          {inventoryLoading && <div style={{...styles.loader, background: "transparent", position: "relative", padding: "20px"}}>Loading pantry from cloud... ☁️</div>}
+          
+          {!inventoryLoading && (
+            <>
+              <input 
+                style={{...styles.input, marginBottom: '20px', borderRadius: '20px', padding: '14px 20px'}} 
+                placeholder="🔍 Search ingredients..." 
+                value={inventorySearch}
+                onChange={e => setInventorySearch(e.target.value)}
+              />
+
+              {inventoryCategories.map(category => {
+                const itemsInCategory = masterIngredients.filter(item => getIngredientCategory(item) === category);
+                const searchedItems = itemsInCategory.filter(item => item.toLowerCase().includes(inventorySearch.toLowerCase()));
+                
+                if (searchedItems.length === 0) return null; 
+                
+                return (
+                  <div key={category} style={styles.block}>
+                    <h3 style={{ marginTop: 0, color: "#444" }}>{category}</h3>
+                    <div style={{ display: "flex", flexWrap: "wrap" }}>
+                      {searchedItems.map((item) => (
+                        <button
+                          key={item}
+                          style={{...styles.tag(inventory[item]), borderColor: inventory[item] ? '#FF8CA1' : '#ddd', color: inventory[item] ? 'white' : '#aaa'}}
+                          onClick={() => toggleIngredient(item)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+
+      {activeTab === "planner" && (
+        <div style={{ position: "relative" }}>
+          {inventoryLoading && <div style={styles.loader}>Syncing with Cloud... ☁️</div>}
+          <div style={styles.block}>
+            <label style={{ fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px", marginBottom: "10px", fontSize: "16px" }}>
+              🍴 Dining Size:
+            </label>
+            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+              {[
+                { id: "one", label: "Single (1)" },
+                { id: "small", label: "Small (2)" },
+                { id: "medium", label: "Medium (3)" },
+                { id: "large", label: "Large (4)" },
+                { id: "xlarge", label: "X-Large (4)" }
+              ].map(size => (
+                <button 
+                  key={size.id} 
+                  style={styles.tag(diningSize === size.id)} 
+                  onClick={() => {
+                    setDiningSize(size.id);
+                    setManualMenu({ mains: [], sides: [], veg: null });
+                  }}
+                >
+                  {size.label}
+                </button>
+              ))}
+            </div>
+            
+            <div style={{ marginTop: "20px" }}>
+              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>🛒 Shopping Preference:</label>
+              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                <button style={styles.tag(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>🛒 Normal</button>
+                <button style={styles.tag(shoppingMode === "minimal")} onClick={() => setShoppingMode("minimal")}>🧺 Minimal</button>
+                <button style={styles.tag(shoppingMode === "none")} onClick={() => setShoppingMode("none")}>🏠 Pantry</button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{...styles.nav, borderBottom: "2px solid #eee", paddingBottom: "15px"}}>
+            <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>Surprise me</button>
+            <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => setMode("manual")}>Let me think</button>
+          </div>
+
+          {mode === "auto" && (
+            <div>
+              <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
+              
+              {generatedMenu && (
+                <div ref={menuRef} style={{...styles.block, marginTop: "20px"}}>
+                  <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
+                  
+                  {generatedMenu.mains.map((m, i) => (
+                    <div style={styles.menuCard} key={`auto-m-${i}`}>
+                      <DishIcon type="main" />
+                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
+                    </div>
+                  ))}
+                  
+                  {generatedMenu.sides.map((s, i) => (
+                    <div style={styles.menuCard} key={`auto-s-${i}`}>
+                      <DishIcon type="side" />
+                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
+                    </div>
+                  ))}
+
+                  {generatedMenu.veg && (
+                    <div style={{...styles.menuCard, borderBottom: "none"}}>
+                      <DishIcon type="veg" />
+                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
+                    </div>
+                  )}
+
+                  <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginTop: "20px"}} onClick={() => handleShare(generatedMenu)}>Send to WhatsApp</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === "manual" && (
+            <div>
+              {diningSize === "one" ? (
+                <div style={styles.block}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
+                  {renderGroupedDishesMulti(getManualOptions('any'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, 1))}
+                </div>
+              ) : (
+                <>
+                  <div style={styles.block}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? `(Pick ${numMains})` : ''}</h3></div>
+                    {renderGroupedDishesMulti(getManualOptions('main'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))}
+                  </div>
+
+                  {numSides > 0 && (
+                    <div style={styles.block}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
+                      {renderGroupedDishesMulti(getManualOptions('side'), manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))}
+                    </div>
+                  )}
+
+                  <div style={styles.block}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
+                    {renderGroupedDishesMulti(getManualOptions('veg'), [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))}
+                  </div>
+                </>
+              )}
+
+              {((diningSize === "one" && manualMenu.mains.length === 1) || 
+                (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
+                <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginBottom: "30px"}} onClick={() => handleShare(manualMenu)}>Send to WhatsApp</button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
