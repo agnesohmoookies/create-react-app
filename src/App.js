@@ -665,18 +665,31 @@ export default function DinnerApp() {
               <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>Shopping Preference:</label>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 
-                {/* Normal Shopping Icon SVG */}
+                {/* --- OVERSTUFFED "NORMAL" CART --- */}
                 <button style={styles.iconBtn(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    {/* The Cart Frame */}
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
                     <circle cx="10" cy="20.5" r="1.5" />
                     <circle cx="18" cy="20.5" r="1.5" />
-                    <rect x="8" y="10" width="4" height="5" rx="1" fill="currentColor" stroke="none" />
-                    <circle cx="15" cy="12.5" r="2.5" fill="currentColor" stroke="none" />
+                    
+                    {/* NEW: Mountain of Products Stacking HIGHER than the handle */}
+                    {/* Item 1: Tilted Box (Stacks far above rim) */}
+                    <rect x="6.5" y="1.5" width="4" height="6" fill="currentColor" stroke="none" rx="0.5" transform="rotate(-5 8.5 4.5)"/>
+                    
+                    {/* Item 2: Lumpy organic item (Stacks in middle) */}
+                    <path d="M10.5 8 A3 3 0 0 1 15.5 8 Q16.5 10, 15.5 12 H10.5 Z" fill="currentColor" stroke="none"/>
+                    <circle cx="13" cy="6" r="2.5" fill="currentColor" stroke="none"/> {/* part extending higher */}
+                    
+                    {/* Item 3: Tall Bottle (Stacks on right) */}
+                    <path d="M17 11 V4 Q17 2.5, 18.5 2.5 H19 Q20.5 2.5, 20.5 4 V11 Z" fill="currentColor" stroke="none" />
+                    
+                    {/* Inside details to show density */}
+                    <line x1="8" y1="13" x2="19" y2="13" />
                   </svg>
                 </button>
 
-                {/* Minimal Shopping Icon SVG */}
+                {/* --- MINIMAL CART (UNCHANGED) --- */}
                 <button style={styles.iconBtn(shoppingMode === "minimal")} onClick={() => setShoppingMode("minimal")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
@@ -688,7 +701,7 @@ export default function DinnerApp() {
                   </svg>
                 </button>
 
-                {/* No Shopping Icon SVG */}
+                {/* --- NO SHOPPING CART (UNCHANGED) --- */}
                 <button style={styles.iconBtn(shoppingMode === "none")} onClick={() => setShoppingMode("none")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
