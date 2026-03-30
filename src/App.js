@@ -673,15 +673,10 @@ export default function DinnerApp() {
                     <circle cx="10" cy="20.5" r="1.5" />
                     <circle cx="18" cy="20.5" r="1.5" />
                     
-                    {/* NEW: Mountain of Products Stacking HIGHER than the handle */}
-                    {/* Item 1: Tilted Box (Stacks far above rim) */}
+                    {/* Mountain of Products Stacking HIGHER than the handle */}
                     <rect x="6.5" y="1.5" width="4" height="6" fill="currentColor" stroke="none" rx="0.5" transform="rotate(-5 8.5 4.5)"/>
-                    
-                    {/* Item 2: Lumpy organic item (Stacks in middle) */}
                     <path d="M10.5 8 A3 3 0 0 1 15.5 8 Q16.5 10, 15.5 12 H10.5 Z" fill="currentColor" stroke="none"/>
-                    <circle cx="13" cy="6" r="2.5" fill="currentColor" stroke="none"/> {/* part extending higher */}
-                    
-                    {/* Item 3: Tall Bottle (Stacks on right) */}
+                    <circle cx="13" cy="6" r="2.5" fill="currentColor" stroke="none"/>
                     <path d="M17 11 V4 Q17 2.5, 18.5 2.5 H19 Q20.5 2.5, 20.5 4 V11 Z" fill="currentColor" stroke="none" />
                     
                     {/* Inside details to show density */}
@@ -701,13 +696,15 @@ export default function DinnerApp() {
                   </svg>
                 </button>
 
-                {/* --- NO SHOPPING CART (UNCHANGED) --- */}
+                {/* --- NO SHOPPING CART (BIG X UPDATE) --- */}
                 <button style={styles.iconBtn(shoppingMode === "none")} onClick={() => setShoppingMode("none")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
                     <circle cx="10" cy="20.5" r="1.5" />
                     <circle cx="18" cy="20.5" r="1.5" />
+                    {/* BIG CROSS */}
                     <line x1="4" y1="4" x2="20" y2="20" strokeWidth="2" />
+                    <line x1="20" y1="4" x2="4" y2="20" strokeWidth="2" />
                   </svg>
                 </button>
 
@@ -769,28 +766,4 @@ export default function DinnerApp() {
                     {renderGroupedDishesMulti(getManualOptions('main'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))}
                   </div>
 
-                  {numSides > 0 && (
-                    <div style={styles.block}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
-                      {renderGroupedDishesMulti(getManualOptions('side'), manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))}
-                    </div>
-                  )}
-
-                  <div style={styles.block}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
-                    {renderGroupedDishesMulti(getManualOptions('veg'), [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))}
-                  </div>
-                </>
-              )}
-
-              {((diningSize === "one" && manualMenu.mains.length === 1) || 
-                (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
-                <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginBottom: "30px"}} onClick={() => handleShare(manualMenu)}>Send to WhatsApp</button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+                  {numSides > 0
