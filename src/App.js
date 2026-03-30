@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 
 // --- 1. OUR DATABASE ---
 const DEFAULT_DISHES = [
@@ -143,6 +143,9 @@ export default function DinnerApp() {
   const allDishes = useMemo(() => [...DEFAULT_DISHES, ...customDishes], [customDishes]);
   const masterIngredients = useMemo(() => getMasterIngredientList(allDishes), [allDishes]);
 
+  // Reference for scrolling to menu
+  const menuRef = useRef(null);
+
   useEffect(() => {
     const savedInventory = localStorage.getItem("dinnerInventory");
     const savedDishes = localStorage.getItem("customDishes");
@@ -173,6 +176,13 @@ export default function DinnerApp() {
     });
   }, [masterIngredients]);
 
+  // Auto-scroll effect whenever a new menu is generated
+  useEffect(() => {
+    if (generatedMenu && menuRef.current) {
+      menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [generatedMenu]);
+
   const toggleIngredient = (item) => {
     const updated = { ...inventory, [item]: !inventory[item] };
     setInventory(updated);
@@ -186,7 +196,7 @@ export default function DinnerApp() {
       id: "c_" + Date.now(),
       name: newDish.name,
       category: newDish.category,
-      protein: newDish.protein || "none", // Defaults to none if left unselected
+      protein: newDish.protein || "none", 
       ingredients: newDish.ingredients,
       remarks: newDish.remarks.trim(),
       onePerson: newDish.onePerson
@@ -308,17 +318,15 @@ export default function DinnerApp() {
     if (diningSize === "one") pool = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
 
     return pool.filter(d => {
-       // 1. Cannot pick a protein used by another category entirely
        if (usedOther.includes(d.protein)) return false;
        
-       // 2. Cannot pick a protein already used in THIS category, UNLESS it's already selected (so we can unselect it)
        const isSelectedSelf = (type === 'main' && manualMenu.mains.find(m => m.id === d.id)) ||
                               (type === 'side' && manualMenu.sides.find(s => s.id === d.id)) ||
                               (type === 'veg' && manualMenu.veg?.id === d.id);
                               
        if (!isSelectedSelf && usedSelf.includes(d.protein)) return false;
 
-       // 3. Shopping limits check
+       // Shopping limits check
        const simulatedMenu = { mains: [...manualMenu.mains], sides: [...manualMenu.sides], veg: manualMenu.veg };
        if (type === 'main' || diningSize === 'one') {
            if (!isSelectedSelf) {
@@ -382,7 +390,7 @@ export default function DinnerApp() {
     tag: (isActive) => ({
       padding: "10px 16px", borderRadius: "20px", border: "1.5px solid #FF8CA1", fontSize: "14px",
       background: isActive ? "#FF8CA1" : "transparent", fontWeight: "600", 
-      whiteSpace: "normal", wordBreak: "break-word", textAlign: "left", height: "auto", // Fixes long text overflow!
+      whiteSpace: "normal", wordBreak: "break-word", textAlign: "left", height: "auto", 
       color: isActive ? "white" : "#FF8CA1", cursor: "pointer", margin: "5px 5px 5px 0"
     }),
     block: { marginBottom: "20px", padding: "20px", background: "#f9f9f9", borderRadius: "16px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" },
@@ -440,7 +448,6 @@ export default function DinnerApp() {
           <div style={styles.categoryHeader}>{group.label}</div>
           <div style={{ display: "flex", flexWrap: "wrap" }}>
             {filtered.map(d => {
-              // Check if THIS specific dish is selected
               const isSelected = selectedItemsArray.some(item => item && item.id === d.id);
               return (
                 <button key={d.id} style={styles.tag(isSelected)} onClick={() => onSelect(d)}>
@@ -597,7 +604,7 @@ export default function DinnerApp() {
                 { id: "one", label: "Single (1)" },
                 { id: "small", label: "Small (2)" },
                 { id: "medium", label: "Medium (3)" },
-                { id: "large", label: "Large (3)" },
+                { id: "large", label: "Large (4)" },
                 { id: "xlarge", label: "X-Large (4)" }
               ].map(size => (
                 <button 
@@ -631,8 +638,10 @@ export default function DinnerApp() {
           {mode === "auto" && (
             <div>
               <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
+              
+              {/* Menu rendering with scrolling ref attached */}
               {generatedMenu && (
-                <div style={{...styles.block, marginTop: "20px"}}>
+                <div ref={menuRef} style={{...styles.block, marginTop: "20px"}}>
                   <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
                   
                   {generatedMenu.mains.map((m, i) => (
