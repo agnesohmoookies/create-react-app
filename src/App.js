@@ -147,6 +147,10 @@ export default function DinnerApp() {
   const [inventory, setInventory] = useState({});
   const [inventorySearch, setInventorySearch] = useState("");
   const [inventoryLoading, setInventoryLoading] = useState(true);
+
+  // NEW: Extra items explicitly added to the shopping list
+  const [extraShoppingItems, setExtraShoppingItems] = useState([]);
+  const [extraShoppingInput, setExtraShoppingInput] = useState("");
   
   const allDishes = useMemo(() => [...DEFAULT_DISHES, ...customDishes], [customDishes]);
   const masterIngredients = useMemo(() => getMasterIngredientList(allDishes), [allDishes]);
@@ -395,16 +399,20 @@ export default function DinnerApp() {
   };
 
   const handleShare = (menuToShare) => {
-    const shoppingList = getMissingIngredients(menuToShare);
+    const baseShoppingList = getMissingIngredients(menuToShare);
+    
+    // Combine base ingredients + extra items, lowercased to prevent exact duplicates (e.g. "Milk" vs "milk")
+    const combinedList = [...baseShoppingList, ...extraShoppingItems];
+    const finalShoppingList = [...new Set(combinedList.map(item => item.toLowerCase()))];
 
     let text = `*Tonight's Dinner*\n`;
     if (menuToShare.mains) menuToShare.mains.forEach((m) => (text += `• ${m.name}${m.remarks ? ` (${m.remarks})` : ""}\n`));
     if (menuToShare.sides) menuToShare.sides.forEach((s) => (text += `• ${s.name}${s.remarks ? ` (${s.remarks})` : ""}\n`));
     if (menuToShare.veg) text += `• ${menuToShare.veg.name}${menuToShare.veg.remarks ? ` (${menuToShare.veg.remarks})` : ""}\n`;
 
-    if (shoppingList.length > 0) {
+    if (finalShoppingList.length > 0) {
       text += `\n*Shopping List*\n`;
-      shoppingList.forEach((item) => (text += `☐ ${item}\n`));
+      finalShoppingList.forEach((item) => (text += `☐ ${item}\n`));
     }
 
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
@@ -495,6 +503,60 @@ export default function DinnerApp() {
     });
   };
 
+  // Reusable component for adding extra items and sharing
+  const renderShareSection = (menuToShare) => (
+    <>
+      <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px", marginTop: "10px"}}>🛒 Add Extra Items to Shopping List</label>
+      
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
+        {extraShoppingItems.map(ing => (
+          <span key={ing} style={{ background: "#FF8CA1", color: "white", padding: "6px 12px", borderRadius: "15px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold" }}>
+            {ing} 
+            <button style={{ border: "none", background: "none", cursor: "pointer", color: "white", padding: 0, fontWeight: "bold", fontSize: "16px" }} onClick={() => setExtraShoppingItems(extraShoppingItems.filter(i => i !== ing))}>×</button>
+          </span>
+        ))}
+      </div>
+
+      <div style={{ position: "relative" }}>
+        <input 
+          style={{...styles.input, marginBottom: "0"}} 
+          placeholder="e.g. Milk, Paper towels & press enter..." 
+          value={extraShoppingInput} 
+          onChange={e => setExtraShoppingInput(e.target.value)}
+          onKeyDown={e => {
+            if(e.key === 'Enter' && extraShoppingInput.trim()) {
+              const term = extraShoppingInput.trim().toLowerCase();
+              if(!extraShoppingItems.includes(term)) setExtraShoppingItems([...extraShoppingItems, term]);
+              setExtraShoppingInput("");
+            }
+          }}
+        />
+        {extraShoppingInput && (
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
+            {masterIngredients.filter(i => i.includes(extraShoppingInput.toLowerCase())).slice(0, 5).map(sug => (
+              <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
+                if(!extraShoppingItems.includes(sug)) setExtraShoppingItems([...extraShoppingItems, sug]);
+                setExtraShoppingInput("");
+              }}>
+                {sug}
+              </div>
+            ))}
+            {!masterIngredients.includes(extraShoppingInput.trim().toLowerCase()) && (
+              <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
+                setExtraShoppingItems([...extraShoppingItems, extraShoppingInput.trim().toLowerCase()]);
+                setExtraShoppingInput("");
+              }}>
+                + Add new: "{extraShoppingInput}"
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginTop: "20px"}} onClick={() => handleShare(menuToShare)}>Send to WhatsApp</button>
+    </>
+  );
+
   const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Condiments"];
   
   const numMains = diningSize === "xlarge" ? 2 : 1;
@@ -542,39 +604,41 @@ export default function DinnerApp() {
             ))}
           </div>
 
-          <input 
-            style={{...styles.input, marginBottom: "0"}} 
-            placeholder="Type an ingredient & press enter..." 
-            value={ingredientInput} 
-            onChange={e => setIngredientInput(e.target.value)}
-            onKeyDown={e => {
-              if(e.key === 'Enter' && ingredientInput.trim()) {
-                const term = ingredientInput.trim().toLowerCase();
-                if(!newDish.ingredients.includes(term)) setNewDish({...newDish, ingredients: [...newDish.ingredients, term]});
-                setIngredientInput("");
-              }
-            }}
-          />
-          {ingredientInput && (
-            <div style={{ border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", marginBottom: "15px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-              {masterIngredients.filter(i => i.includes(ingredientInput.toLowerCase())).slice(0, 5).map(sug => (
-                <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
-                  if(!newDish.ingredients.includes(sug)) setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
+          <div style={{ position: "relative" }}>
+            <input 
+              style={{...styles.input, marginBottom: "0"}} 
+              placeholder="Type an ingredient & press enter..." 
+              value={ingredientInput} 
+              onChange={e => setIngredientInput(e.target.value)}
+              onKeyDown={e => {
+                if(e.key === 'Enter' && ingredientInput.trim()) {
+                  const term = ingredientInput.trim().toLowerCase();
+                  if(!newDish.ingredients.includes(term)) setNewDish({...newDish, ingredients: [...newDish.ingredients, term]});
                   setIngredientInput("");
-                }}>
-                  {sug}
-                </div>
-              ))}
-              {!masterIngredients.includes(ingredientInput.trim().toLowerCase()) && (
-                <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
-                  setNewDish({...newDish, ingredients: [...newDish.ingredients, ingredientInput.trim().toLowerCase()]});
-                  setIngredientInput("");
-                }}>
-                  + Add new: "{ingredientInput}"
-                </div>
-              )}
-            </div>
-          )}
+                }
+              }}
+            />
+            {ingredientInput && (
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
+                {masterIngredients.filter(i => i.includes(ingredientInput.toLowerCase())).slice(0, 5).map(sug => (
+                  <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
+                    if(!newDish.ingredients.includes(sug)) setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
+                    setIngredientInput("");
+                  }}>
+                    {sug}
+                  </div>
+                ))}
+                {!masterIngredients.includes(ingredientInput.trim().toLowerCase()) && (
+                  <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
+                    setNewDish({...newDish, ingredients: [...newDish.ingredients, ingredientInput.trim().toLowerCase()]});
+                    setIngredientInput("");
+                  }}>
+                    + Add new: "{ingredientInput}"
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div style={{marginTop: "15px"}}>
             <label style={{fontWeight: "bold", fontSize: "14px"}}>Remarks (Optional)</label>
@@ -679,15 +743,12 @@ export default function DinnerApp() {
                   </svg>
                 </button>
 
-                {/* --- MINIMAL CART (2 ITEMS UPDATE) --- */}
+                {/* --- MINIMAL CART --- */}
                 <button style={styles.iconBtn(shoppingMode === "minimal")} onClick={() => setShoppingMode("minimal")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    {/* The Cart Frame */}
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
                     <circle cx="10" cy="20.5" r="1.5" />
                     <circle cx="18" cy="20.5" r="1.5" />
-                    
-                    {/* 2 Items resting at the bottom */}
                     <rect x="8.5" y="11" width="4.5" height="6" rx="1" fill="currentColor" stroke="none" />
                     <circle cx="15.5" cy="14" r="2.5" fill="currentColor" stroke="none" />
                   </svg>
@@ -742,7 +803,9 @@ export default function DinnerApp() {
                     </div>
                   )}
 
-                  <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginTop: "20px"}} onClick={() => handleShare(generatedMenu)}>Send to WhatsApp</button>
+                  <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #eee" }}>
+                    {renderShareSection(generatedMenu)}
+                  </div>
                 </div>
               )}
             </div>
@@ -770,7 +833,7 @@ export default function DinnerApp() {
                   )}
 
                   <div style={styles.block}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Vegetable</h3></div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: "0", fontSize: "20px" }}>Select Vegetable</h3></div>
                     {renderGroupedDishesMulti(getManualOptions('veg'), [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))}
                   </div>
                 </>
@@ -778,7 +841,9 @@ export default function DinnerApp() {
 
               {((diningSize === "one" && manualMenu.mains.length === 1) || 
                 (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
-                <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginBottom: "30px"}} onClick={() => handleShare(manualMenu)}>Send to WhatsApp</button>
+                <div style={{...styles.block, marginBottom: "30px"}}>
+                  {renderShareSection(manualMenu)}
+                </div>
               )}
             </div>
           )}
