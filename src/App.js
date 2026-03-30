@@ -74,7 +74,7 @@ const DEFAULT_DISHES = [
   { id: "s16", name: "Oxtail soup in tomato with celery, carrot, onion, cabbage and potato", category: "side", protein: "beef", ingredients: ["oxtail", "tomato", "celery", "carrot", "onion", "cabbage", "potato"] },
   { id: "s17", name: "Stir fry scallop, celery, carrots and ginger", category: "side", protein: "seafood", ingredients: ["scallop", "celery", "carrot", "ginger"] },
   { id: "s18", name: "Cold spinach and Shimeji salad", category: "side", protein: "none", ingredients: ["spinach", "shimeji mushroom"], remarks: "Cookbook p.124" },
-  { id: "s19", name: "Cold pumpkin with egg salad", category: "side", protein: "none", ingredients: ["pumpkin", "egg", "mayo"] }, // <-- Changed to "mayo"
+  { id: "s19", name: "Cold pumpkin with egg salad", category: "side", protein: "none", ingredients: ["pumpkin", "egg", "mayo"] },
   { id: "s20", name: "Cold tofu with cherry tomatoes in sesame sauce", category: "side", protein: "none", ingredients: ["tofu", "cherry tomatoes", "sesame sauce"] },
   { id: "s21", name: "Stir fry scallop, yam and celery", category: "side", protein: "seafood", ingredients: ["scallop", "yam", "celery"] },
   { id: "s22", name: "Muddy red and green carrots, corn and pork shank soup", category: "side", protein: "none", ingredients: ["muddy carrot", "green carrot", "corn", "pork shank"] },
@@ -161,6 +161,7 @@ export default function DinnerApp() {
 
   // SCROLL REFS
   const menuRef = useRef(null);
+  const mainRef = useRef(null);
   const sideRef = useRef(null);
   const vegRef = useRef(null);
   const shareRef = useRef(null);
@@ -736,10 +737,10 @@ export default function DinnerApp() {
         <div style={{ position: "relative" }}>
           {inventoryLoading && <div style={styles.loader}>Teleporting to your kitchen... 🪄🍳</div>}
           <div style={styles.block}>
-            <label style={{ fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px", marginBottom: "10px", fontSize: "16px" }}>
-              🍴 Dining Size
+            <label style={{ fontWeight: "bold", display: "block", textAlign: "center", marginBottom: "10px", fontSize: "16px" }}>
+              Dining Size
             </label>
-            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "5px", flexWrap: "wrap" }}>
               {[
                 { id: "one", label: "1" },
                 { id: "small", label: "2" },
@@ -761,8 +762,10 @@ export default function DinnerApp() {
             </div>
             
             <div style={{ marginTop: "20px" }}>
-              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "16px" }}>🛒 Shopping Preference</label>
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <label style={{ fontWeight: "bold", display: "block", textAlign: "center", marginBottom: "10px", fontSize: "16px" }}>
+                Shopping Preference
+              </label>
+              <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
                 
                 {/* --- NORMAL CART --- */}
                 <button style={styles.iconBtn(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>
@@ -795,8 +798,6 @@ export default function DinnerApp() {
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
                     <circle cx="10" cy="20.5" r="1.5" />
                     <circle cx="18" cy="20.5" r="1.5" />
-                    <line x1="4" y1="4" x2="20" y2="20" strokeWidth="2" />
-                    <line x1="20" y1="4" x2="4" y2="20" strokeWidth="2" />
                   </svg>
                 </button>
 
@@ -806,7 +807,12 @@ export default function DinnerApp() {
 
           <div style={{...styles.nav, borderBottom: "2px solid #eee", paddingBottom: "15px"}}>
             <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>💡 Surprise me</button>
-            <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => setMode("manual")}>💭 Let me think</button>
+            <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => {
+              setMode("manual");
+              setTimeout(() => {
+                if (mainRef.current) mainRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 100);
+            }}>💭 Let me think</button>
           </div>
 
           {mode === "auto" && (
@@ -849,13 +855,13 @@ export default function DinnerApp() {
           {mode === "manual" && (
             <div>
               {diningSize === "one" ? (
-                <div style={styles.block}>
+                <div style={styles.block} ref={mainRef}>
                   <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
                   {renderGroupedDishesMulti(getManualOptions('any'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, 1))}
                 </div>
               ) : (
                 <>
-                  <div style={styles.block}>
+                  <div style={styles.block} ref={mainRef}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? `(Pick ${numMains})` : ''}</h3></div>
                     {renderGroupedDishesMulti(getManualOptions('main'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))}
                   </div>
