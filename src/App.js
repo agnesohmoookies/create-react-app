@@ -178,10 +178,11 @@ export default function DinnerApp() {
         setInventory(merged);
         setInventoryLoading(false);
 
-        // Upload merged items back to sheet
+        // VIP Pass: Upload merged items back to sheet using mode: "no-cors"
         if (changed) {
           fetch(SCRIPT_URL, {
             method: "POST",
+            mode: "no-cors",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(merged)
           }).catch(err => console.error("Sync back failed", err));
@@ -207,11 +208,12 @@ export default function DinnerApp() {
   const toggleIngredient = (item) => {
     const updated = { ...inventory, [item]: !inventory[item] };
     setInventory(updated); // Optimistic UI update
-    localStorage.setItem("dinnerInventory", JSON.stringify(updated)); // Local backup
+    localStorage.setItem("dinnerInventory", JSON.stringify(updated)); 
     
-    // Save to Cloud
+    // VIP Pass: Save to Cloud using mode: "no-cors"
     fetch(SCRIPT_URL, {
       method: "POST",
+      mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(updated)
     }).catch(err => console.error("Cloud save failed", err));
