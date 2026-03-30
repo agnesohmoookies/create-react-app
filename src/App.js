@@ -115,7 +115,7 @@ const getMasterIngredientList = (allDishes) => {
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
   
-  if (lower.includes("rice paper") || lower.includes("dumpling skin") || lower.includes("peanut") || lower.includes("scallion") || lower.includes("onion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
+  if (lower.includes("rice paper") || lower.includes("dumpling skin") || lower.includes("peanut") || lower.includes("scallion") || lower.includes("curry") || lower.includes("coconut") || lower.includes("garlic") || lower.includes("ginger") || lower.includes("lemon") || lower.includes("osmanthus") || lower.includes("vermicelli") || lower.includes("cashew") || lower.includes("egg") || lower.includes("sauce") || lower.includes("butter") || lower.includes("salt") || lower.includes("mayo") || lower.includes("miso") || lower.includes("cheese") || lower.includes("vinegar") || lower.includes("coriander")) return "Condiments"; 
   if (lower.includes("pork") || lower.includes("cha siu")) return "Pork";
   if (lower.includes("beef") || lower.includes("steak") || lower.includes("oxtail")) return "Beef";
   if (lower.includes("chicken")) return "Chicken";
@@ -124,7 +124,7 @@ const getIngredientCategory = (item) => {
   
   if (lower.includes("mushroom") || lower.includes("fungus")) return "Mushrooms";
   if (lower.includes("cabbage") || lower.includes("pak choi") || lower.includes("choi sum") || lower.includes("spinach") || lower.includes("lettuce") || lower.includes("green sprout")) return "Leafy Greens";
-  if (lower.includes("potato") || lower.includes("carrot") || lower.includes("radish") || lower.includes("melon") || lower.includes("chayote") || lower.includes("pumpkin") || lower.includes("yam") || lower.includes("chestnut") || lower.includes("eggplant") || lower.includes("lotus") || lower.includes("corn")) return "Root Veggies & Gourds";
+  if (lower.includes("potato") || lower.includes("carrot") || lower.includes("radish") || lower.includes("onion") || lower.includes("melon") || lower.includes("chayote") || lower.includes("pumpkin") || lower.includes("yam") || lower.includes("chestnut") || lower.includes("eggplant") || lower.includes("lotus") || lower.includes("corn")) return "Root Veggies & Gourds";
   
   return "Other Veggies"; 
 };
