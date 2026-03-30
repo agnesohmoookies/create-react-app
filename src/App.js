@@ -115,26 +115,20 @@ const getMasterIngredientList = (allDishes) => {
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
   
-  // Smart Regex Bouncer: Checks for whole words and their plural forms (e.g., "egg" or "eggs"), 
-  // but prevents partial matches (like "egg" triggering on "eggplant").
   const hasWord = (words) => new RegExp(`\\b(${words.join('|')})(s|es)?\\b`, 'i').test(lower);
 
-  // 1. SPECIFIC MULTI-WORD PHRASES (Must be checked first!)
   if (hasWord(["spring onion"])) return "Condiments";
 
-  // 2. PROTEINS
   if (hasWord(["pork", "cha siu"])) return "Pork";
   if (hasWord(["beef", "steak", "oxtail"])) return "Beef";
   if (hasWord(["chicken"])) return "Chicken";
   if (hasWord(["fish", "clam", "shrimp", "scallop", "pomfret", "halibut", "squid", "octopus", "salmon", "noodlefish"])) return "Seafood";
   if (hasWord(["tofu", "soy"])) return "Soy";
 
-  // 3. VEGGIES
   if (hasWord(["mushroom", "fungus"])) return "Mushrooms";
   if (hasWord(["cabbage", "pak choi", "choi sum", "spinach", "lettuce", "sprout"])) return "Leafy Greens";
   if (hasWord(["potato", "carrot", "radish", "melon", "chayote", "pumpkin", "yam", "chestnut", "lotus", "corn", "onion", "eggplant"])) return "Root Veggies & Gourds";
 
-  // 4. CONDIMENTS
   if (hasWord(["rice paper", "dumpling skin", "peanut", "scallion", "curry", "coconut", "garlic", "ginger", "lemon", "osmanthus", "vermicelli", "cashew", "egg", "sauce", "butter", "salt", "mayo", "mayonnaise", "miso", "cheese", "vinegar", "coriander"])) return "Condiments";
 
   return "Other Veggies"; 
@@ -426,6 +420,12 @@ export default function DinnerApp() {
       whiteSpace: "normal", wordBreak: "break-word", textAlign: "left", height: "auto", 
       color: isActive ? "white" : "#FF8CA1", cursor: "pointer", margin: "5px 5px 5px 0"
     }),
+    iconBtn: (isActive) => ({
+      display: "flex", alignItems: "center", justifyContent: "center",
+      width: "60px", height: "60px", borderRadius: "16px", border: "2px solid #FF8CA1",
+      background: isActive ? "#FF8CA1" : "transparent",
+      color: isActive ? "white" : "#FF8CA1", cursor: "pointer", padding: "0"
+    }),
     block: { marginBottom: "20px", padding: "20px", background: "#f9f9f9", borderRadius: "16px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", position: "relative" },
     btn: { background: "#FF8CA1", color: "white", padding: "16px", border: "none", borderRadius: "14px", width: "100%", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "10px", boxShadow: "0 4px 12px rgba(255, 140, 161, 0.3)" },
     categoryHeader: { fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", color: "#888", marginTop: "15px", marginBottom: "8px" },
@@ -662,11 +662,42 @@ export default function DinnerApp() {
             </div>
             
             <div style={{ marginTop: "20px" }}>
-              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>🛒 Shopping Preference:</label>
-              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
-                <button style={styles.tag(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>🛒 Normal</button>
-                <button style={styles.tag(shoppingMode === "minimal")} onClick={() => setShoppingMode("minimal")}>🧺 Minimal</button>
-                <button style={styles.tag(shoppingMode === "none")} onClick={() => setShoppingMode("none")}>🏠 Pantry</button>
+              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>Shopping Preference:</label>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                
+                {/* Normal Shopping Icon SVG */}
+                <button style={styles.iconBtn(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
+                    <circle cx="10" cy="20.5" r="1.5" />
+                    <circle cx="18" cy="20.5" r="1.5" />
+                    <rect x="8" y="10" width="4" height="5" rx="1" fill="currentColor" stroke="none" />
+                    <circle cx="15" cy="12.5" r="2.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </button>
+
+                {/* Minimal Shopping Icon SVG */}
+                <button style={styles.iconBtn(shoppingMode === "minimal")} onClick={() => setShoppingMode("minimal")}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
+                    <circle cx="10" cy="20.5" r="1.5" />
+                    <circle cx="18" cy="20.5" r="1.5" />
+                    <line x1="6" y1="11" x2="20" y2="11" strokeWidth="1.5"/>
+                    <line x1="10" y1="6" x2="11.5" y2="17" strokeWidth="1.5"/>
+                    <line x1="16" y1="6" x2="14.5" y2="17" strokeWidth="1.5"/>
+                  </svg>
+                </button>
+
+                {/* No Shopping Icon SVG */}
+                <button style={styles.iconBtn(shoppingMode === "none")} onClick={() => setShoppingMode("none")}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
+                    <circle cx="10" cy="20.5" r="1.5" />
+                    <circle cx="18" cy="20.5" r="1.5" />
+                    <line x1="4" y1="4" x2="20" y2="20" strokeWidth="2" />
+                  </svg>
+                </button>
+
               </div>
             </div>
           </div>
