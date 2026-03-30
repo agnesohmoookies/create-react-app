@@ -475,7 +475,10 @@ export default function DinnerApp() {
     btn: { background: "#FF8CA1", color: "white", padding: "16px", border: "none", borderRadius: "14px", width: "100%", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "10px", boxShadow: "0 4px 12px rgba(255, 140, 161, 0.3)" },
     categoryHeader: { fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", color: "#888", marginTop: "15px", marginBottom: "8px" },
     menuCard: { display: "flex", alignItems: "center", gap: "15px", padding: "12px 0", borderBottom: "1px solid #eee" },
-    input: { width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #ddd", marginBottom: "15px", boxSizing: "border-box", fontSize: "16px" },
+    
+    // UPDATED MASTER INPUT STYLE
+    input: { width: "100%", padding: "14px 20px", borderRadius: "20px", border: "1px solid #ddd", marginBottom: "15px", boxSizing: "border-box", fontSize: "16px" },
+    
     loader: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, borderRadius: "16px", fontWeight: "bold", color: "#FF8CA1" }
   };
 
@@ -556,7 +559,7 @@ export default function DinnerApp() {
       <div style={{ position: "relative" }}>
         <input 
           style={{...styles.input, marginBottom: "0"}} 
-          placeholder="e.g. Milk, Paper towels & press enter..." 
+          placeholder="Type an item & press enter..." 
           value={extraShoppingInput} 
           onChange={e => setExtraShoppingInput(e.target.value)}
           onKeyDown={e => {
@@ -613,7 +616,7 @@ export default function DinnerApp() {
           <h3 style={{ marginTop: 0 }}>Add a New Dish</h3>
           
           <label style={{fontWeight: "bold", fontSize: "14px"}}>Dish Name</label>
-          <input style={styles.input} placeholder="e.g. Tomato Egg Stir Fry" value={newDish.name} onChange={e => setNewDish({...newDish, name: e.target.value})} />
+          <input style={styles.input} placeholder="Name a dish..." value={newDish.name} onChange={e => setNewDish({...newDish, name: e.target.value})} />
 
           <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Category</label>
           <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
@@ -678,7 +681,7 @@ export default function DinnerApp() {
 
           <div style={{marginTop: "15px"}}>
             <label style={{fontWeight: "bold", fontSize: "14px"}}>Remarks (Optional)</label>
-            <input style={styles.input} placeholder="e.g. Cookbook p.92" value={newDish.remarks} onChange={e => setNewDish({...newDish, remarks: e.target.value})} />
+            <input style={styles.input} placeholder="Cookbook p.92..." value={newDish.remarks} onChange={e => setNewDish({...newDish, remarks: e.target.value})} />
           </div>
 
           <div style={{marginTop: "10px", marginBottom: "20px"}}>
@@ -699,8 +702,8 @@ export default function DinnerApp() {
           {!inventoryLoading && (
             <>
               <input 
-                style={{...styles.input, marginBottom: '20px', borderRadius: '20px', padding: '14px 20px'}} 
-                placeholder="🔍 Search ingredients..." 
+                style={{...styles.input, marginBottom: '20px'}} 
+                placeholder="Search ingredients..." 
                 value={inventorySearch}
                 onChange={e => setInventorySearch(e.target.value)}
               />
