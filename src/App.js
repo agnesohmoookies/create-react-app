@@ -541,7 +541,7 @@ export default function DinnerApp() {
 
   const renderShareSection = (menuToShare) => (
     <>
-      <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px", marginTop: "10px"}}>🛒 Add Extra Items to Shopping List</label>
+      <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px", marginTop: "10px"}}>🥑 Add extra items to shopping list</label>
       
       <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
         {extraShoppingItems.map(ing => (
@@ -693,7 +693,7 @@ export default function DinnerApp() {
 
       {activeTab === "inventory" && (
         <div style={{ position: "relative" }}>
-          {inventoryLoading && <div style={{...styles.loader, background: "transparent", position: "relative", padding: "20px"}}>Loading pantry from cloud... ☁️</div>}
+          {inventoryLoading && <div style={{...styles.loader, background: "transparent", position: "relative", padding: "20px"}}>Teleporting to your kitchen... 🪄🍳</div>}
           
           {!inventoryLoading && (
             <>
@@ -734,7 +734,7 @@ export default function DinnerApp() {
 
       {activeTab === "planner" && (
         <div style={{ position: "relative" }}>
-          {inventoryLoading && <div style={styles.loader}>Syncing with Cloud... ☁️</div>}
+          {inventoryLoading && <div style={styles.loader}>Teleporting to your kitchen... 🪄🍳</div>}
           <div style={styles.block}>
             <label style={{ fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px", marginBottom: "10px", fontSize: "16px" }}>
               🍴 Dining Size:
@@ -761,7 +761,7 @@ export default function DinnerApp() {
             </div>
             
             <div style={{ marginTop: "20px" }}>
-              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>Shopping Preference:</label>
+              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>🛒 Shopping Preference:</label>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 
                 {/* --- NORMAL CART --- */}
@@ -805,8 +805,8 @@ export default function DinnerApp() {
           </div>
 
           <div style={{...styles.nav, borderBottom: "2px solid #eee", paddingBottom: "15px"}}>
-            <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>Surprise me</button>
-            <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => setMode("manual")}>Let me think</button>
+            <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>💡 Surprise me</button>
+            <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => setMode("manual")}>💭 Let me think</button>
           </div>
 
           {mode === "auto" && (
