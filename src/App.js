@@ -541,7 +541,7 @@ export default function DinnerApp() {
 
   const renderShareSection = (menuToShare) => (
     <>
-      <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px", marginTop: "10px"}}>🥑 Add extra items to shopping list</label>
+      <label style={{fontWeight: "bold", fontSize: "16px", display: "block", marginBottom: "8px", marginTop: "10px"}}>🥑 Add extra items to shopping list</label>
       
       <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
         {extraShoppingItems.map(ing => (
@@ -737,7 +737,7 @@ export default function DinnerApp() {
           {inventoryLoading && <div style={styles.loader}>Teleporting to your kitchen... 🪄🍳</div>}
           <div style={styles.block}>
             <label style={{ fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px", marginBottom: "10px", fontSize: "16px" }}>
-              🍴 Dining Size:
+              🍴 Dining Size
             </label>
             <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
               {[
@@ -761,7 +761,7 @@ export default function DinnerApp() {
             </div>
             
             <div style={{ marginTop: "20px" }}>
-              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>🛒 Shopping Preference:</label>
+              <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "16px" }}>🛒 Shopping Preference</label>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 
                 {/* --- NORMAL CART --- */}
