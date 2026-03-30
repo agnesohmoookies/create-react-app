@@ -74,7 +74,7 @@ const DEFAULT_DISHES = [
   { id: "s16", name: "Oxtail soup in tomato with celery, carrot, onion, cabbage and potato", category: "side", protein: "beef", ingredients: ["oxtail", "tomato", "celery", "carrot", "onion", "cabbage", "potato"] },
   { id: "s17", name: "Stir fry scallop, celery, carrots and ginger", category: "side", protein: "seafood", ingredients: ["scallop", "celery", "carrot", "ginger"] },
   { id: "s18", name: "Cold spinach and Shimeji salad", category: "side", protein: "none", ingredients: ["spinach", "shimeji mushroom"], remarks: "Cookbook p.124" },
-  { id: "s19", name: "Cold pumpkin with egg salad", category: "side", protein: "none", ingredients: ["pumpkin", "egg", "mayonnaise"] },
+  { id: "s19", name: "Cold pumpkin with egg salad", category: "side", protein: "none", ingredients: ["pumpkin", "egg", "mayo"] }, // <-- Changed to "mayo"
   { id: "s20", name: "Cold tofu with cherry tomatoes in sesame sauce", category: "side", protein: "none", ingredients: ["tofu", "cherry tomatoes", "sesame sauce"] },
   { id: "s21", name: "Stir fry scallop, yam and celery", category: "side", protein: "seafood", ingredients: ["scallop", "yam", "celery"] },
   { id: "s22", name: "Muddy red and green carrots, corn and pork shank soup", category: "side", protein: "none", ingredients: ["muddy carrot", "green carrot", "corn", "pork shank"] },
@@ -119,6 +119,11 @@ const getIngredientCategory = (item) => {
 
   if (hasWord(["spring onion"])) return "Condiments";
 
+  // NEW CATEGORIES
+  if (hasWord(["apple", "lemon"])) return "Fruits";
+  if (hasWord(["peanut", "cashew"])) return "Nuts";
+  if (hasWord(["rice paper", "dumpling skin", "vermicelli", "udon", "noodle"])) return "Grains & Wrappers";
+
   if (hasWord(["pork", "cha siu"])) return "Pork";
   if (hasWord(["beef", "steak", "oxtail"])) return "Beef";
   if (hasWord(["chicken"])) return "Chicken";
@@ -129,7 +134,7 @@ const getIngredientCategory = (item) => {
   if (hasWord(["cabbage", "pak choi", "choi sum", "spinach", "lettuce", "sprout"])) return "Leafy Greens";
   if (hasWord(["potato", "carrot", "radish", "melon", "chayote", "pumpkin", "yam", "chestnut", "lotus", "corn", "onion", "eggplant"])) return "Root Veggies & Gourds";
 
-  if (hasWord(["rice paper", "dumpling skin", "peanut", "scallion", "curry", "coconut", "garlic", "ginger", "lemon", "osmanthus", "vermicelli", "cashew", "egg", "sauce", "butter", "salt", "mayo", "mayonnaise", "miso", "cheese", "vinegar", "coriander"])) return "Condiments";
+  if (hasWord(["scallion", "curry", "coconut", "garlic", "ginger", "osmanthus", "egg", "sauce", "butter", "salt", "mayo", "mayonnaise", "miso", "cheese", "vinegar", "coriander"])) return "Condiments";
 
   return "Other Veggies"; 
 };
@@ -148,14 +153,17 @@ export default function DinnerApp() {
   const [inventorySearch, setInventorySearch] = useState("");
   const [inventoryLoading, setInventoryLoading] = useState(true);
 
-  // NEW: Extra items explicitly added to the shopping list
   const [extraShoppingItems, setExtraShoppingItems] = useState([]);
   const [extraShoppingInput, setExtraShoppingInput] = useState("");
   
   const allDishes = useMemo(() => [...DEFAULT_DISHES, ...customDishes], [customDishes]);
   const masterIngredients = useMemo(() => getMasterIngredientList(allDishes), [allDishes]);
 
+  // SCROLL REFS
   const menuRef = useRef(null);
+  const sideRef = useRef(null);
+  const vegRef = useRef(null);
+  const shareRef = useRef(null);
 
   // CLOUD LOAD
   useEffect(() => {
@@ -210,6 +218,7 @@ export default function DinnerApp() {
     loadCloudInventory();
   }, [masterIngredients]);
 
+  // Handle inventory toggles
   const toggleIngredient = (item) => {
     const updated = { ...inventory, [item]: !inventory[item] };
     setInventory(updated); 
@@ -247,6 +256,35 @@ export default function DinnerApp() {
   const [mode, setMode] = useState("auto");
   const [generatedMenu, setGeneratedMenu] = useState(null);
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
+
+  // AUTO SCROLL LOGIC
+  useEffect(() => {
+    if (mode === "auto" && generatedMenu && menuRef.current) {
+      setTimeout(() => menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }
+  }, [generatedMenu, mode]);
+
+  useEffect(() => {
+    if (mode === "manual") {
+      if (diningSize === "one") {
+         if (manualMenu.mains.length === 1 && shareRef.current) {
+             setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+         }
+      } else {
+          const numMains = diningSize === "xlarge" ? 2 : 1;
+          const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
+
+          if (manualMenu.mains.length === numMains && manualMenu.sides.length < numSides && sideRef.current) {
+              setTimeout(() => sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          } else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg === null && vegRef.current) {
+              setTimeout(() => vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          } else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null && shareRef.current) {
+              setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          }
+      }
+    }
+  }, [manualMenu, mode, diningSize]);
+
 
   // --- 4. LOGIC ---
   const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
@@ -400,8 +438,6 @@ export default function DinnerApp() {
 
   const handleShare = (menuToShare) => {
     const baseShoppingList = getMissingIngredients(menuToShare);
-    
-    // Combine base ingredients + extra items, lowercased to prevent exact duplicates (e.g. "Milk" vs "milk")
     const combinedList = [...baseShoppingList, ...extraShoppingItems];
     const finalShoppingList = [...new Set(combinedList.map(item => item.toLowerCase()))];
 
@@ -503,7 +539,6 @@ export default function DinnerApp() {
     });
   };
 
-  // Reusable component for adding extra items and sharing
   const renderShareSection = (menuToShare) => (
     <>
       <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px", marginTop: "10px"}}>🛒 Add Extra Items to Shopping List</label>
@@ -557,7 +592,7 @@ export default function DinnerApp() {
     </>
   );
 
-  const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Condiments"];
+  const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Fruits", "Nuts", "Grains & Wrappers", "Condiments"];
   
   const numMains = diningSize === "xlarge" ? 2 : 1;
   const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
@@ -706,11 +741,11 @@ export default function DinnerApp() {
             </label>
             <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
               {[
-                { id: "one", label: "Single (1)" },
-                { id: "small", label: "Small (2)" },
-                { id: "medium", label: "Medium (3)" },
-                { id: "large", label: "Large (4)" },
-                { id: "xlarge", label: "X-Large (4)" }
+                { id: "one", label: "1" },
+                { id: "small", label: "2" },
+                { id: "medium", label: "3" },
+                { id: "large", label: "4" },
+                { id: "xlarge", label: "5+" }
               ].map(size => (
                 <button 
                   key={size.id} 
@@ -729,7 +764,7 @@ export default function DinnerApp() {
               <label style={{ fontWeight: "bold", display: "block", marginBottom: "10px", fontSize: "14px" }}>Shopping Preference:</label>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 
-                {/* --- OVERSTUFFED "NORMAL" CART --- */}
+                {/* --- NORMAL CART --- */}
                 <button style={styles.iconBtn(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
@@ -826,13 +861,13 @@ export default function DinnerApp() {
                   </div>
 
                   {numSides > 0 && (
-                    <div style={styles.block}>
+                    <div style={styles.block} ref={sideRef}>
                       <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
                       {renderGroupedDishesMulti(getManualOptions('side'), manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))}
                     </div>
                   )}
 
-                  <div style={styles.block}>
+                  <div style={styles.block} ref={vegRef}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: "0", fontSize: "20px" }}>Select Vegetable</h3></div>
                     {renderGroupedDishesMulti(getManualOptions('veg'), [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))}
                   </div>
@@ -841,7 +876,7 @@ export default function DinnerApp() {
 
               {((diningSize === "one" && manualMenu.mains.length === 1) || 
                 (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
-                <div style={{...styles.block, marginBottom: "30px"}}>
+                <div style={{...styles.block, marginBottom: "30px"}} ref={shareRef}>
                   {renderShareSection(manualMenu)}
                 </div>
               )}
