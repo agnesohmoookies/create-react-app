@@ -703,7 +703,7 @@ export default function DinnerApp() {
             <>
               <input 
                 style={{...styles.input, marginBottom: '20px'}} 
-                placeholder="Search ingredients..." 
+                placeholder="🔍 Search ingredients..." 
                 value={inventorySearch}
                 onChange={e => setInventorySearch(e.target.value)}
               />
