@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 // --- CLOUD API URL ---
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPuEREoE7cGkKzWEF_H17DO9-o-kKn0COEJDE-1SSlhSYfypFvHlRLiUy4GF9gUINr8g/exec";
 
-// --- 1. OUR DATABASE ---
+// --- TEMPORARY DATABASE (For Migration Only!) ---
 const DEFAULT_DISHES = [
   { id: "m1", name: "Dumplings in two types (Chinese chive and minced pork, Chinese celery, Chinese mushroom and minced pork)", category: "main", protein: "pork", ingredients: ["dumpling skin", "minced pork", "chinese chive", "chinese celery", "chinese mushroom"], onePerson: true },
   { id: "m2", name: "Rice in winter melon, minced pork, Chinese mushroom, Coriander soup", category: "main", protein: "pork", ingredients: ["winter melon", "minced pork", "chinese mushroom", "coriander"], onePerson: true },
@@ -102,145 +102,175 @@ const DEFAULT_DISHES = [
   { id: "v16", name: "Stir fry Choi Sum", category: "veg", protein: "none", ingredients: ["choi sum"] }
 ];
 
-// --- 2. HELPER FUNCTIONS ---
+const formatNameUI = (name) => name ? name.replace(/\s*\(.*?\)/g, '') : "";
 const getRandomDish = (dishes) => dishes[Math.floor(Math.random() * dishes.length)];
 
-const formatNameUI = (name) => name.replace(/\s*\(.*?\)/g, '');
-
-const getMasterIngredientList = (allDishes) => {
-  const allIngredients = allDishes.flatMap((dish) => dish.ingredients);
-  return [...new Set(allIngredients)].sort();
-};
-
+// The original categorization engine (used as a fallback when migrating or adding net-new ingredients)
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
-  
   const hasWord = (words) => new RegExp(`\\b(${words.join('|')})(s|es)?\\b`, 'i').test(lower);
 
   if (hasWord(["spring onion"])) return "Condiments";
-
-  // NEW CATEGORIES
   if (hasWord(["apple", "lemon"])) return "Fruits";
   if (hasWord(["peanut", "cashew"])) return "Nuts";
   if (hasWord(["rice paper", "dumpling skin", "vermicelli", "udon", "noodle"])) return "Grains & Wrappers";
-
   if (hasWord(["pork", "cha siu"])) return "Pork";
+  if (hasWord(["fish", "clam", "shrimp", "scallop", "pomfret", "halibut", "squid", "octopus", "salmon", "noodlefish"])) return "Seafood";
   if (hasWord(["beef", "steak", "oxtail"])) return "Beef";
   if (hasWord(["chicken"])) return "Chicken";
-  if (hasWord(["fish", "clam", "shrimp", "scallop", "pomfret", "halibut", "squid", "octopus", "salmon", "noodlefish"])) return "Seafood";
   if (hasWord(["tofu", "soy"])) return "Soy";
-
   if (hasWord(["mushroom", "fungus"])) return "Mushrooms";
   if (hasWord(["cabbage", "pak choi", "choi sum", "spinach", "lettuce", "sprout"])) return "Leafy Greens";
   if (hasWord(["potato", "carrot", "radish", "melon", "chayote", "pumpkin", "yam", "chestnut", "lotus", "corn", "onion", "eggplant"])) return "Root Veggies & Gourds";
-
   if (hasWord(["scallion", "curry", "coconut", "garlic", "ginger", "osmanthus", "egg", "sauce", "butter", "salt", "mayo", "mayonnaise", "miso", "cheese", "vinegar", "coriander"])) return "Condiments";
-
   return "Other Veggies"; 
 };
 
+// Strict display order for categories
+const CATEGORY_ORDER = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Fruits", "Nuts", "Grains & Wrappers", "Condiments", "Needs Review"];
+
 export default function DinnerApp() {
-  // --- 3. STATE MANAGEMENT ---
+  // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState("planner"); 
   const [diningSize, setDiningSize] = useState("medium"); 
   const [shoppingMode, setShoppingMode] = useState("any"); 
+  const [mode, setMode] = useState("auto");
   
-  // FIX: Load custom dishes instantly on launch
-  const [customDishes, setCustomDishes] = useState(() => {
-    const savedDishes = localStorage.getItem("customDishes");
-    return savedDishes ? JSON.parse(savedDishes) : [];
+  // Stale-While-Revalidate: Load from LocalStorage instantly!
+  const [dishes, setDishes] = useState(() => {
+    const local = localStorage.getItem("v3_dishes");
+    return local ? JSON.parse(local) : [];
+  });
+  
+  const [inventory, setInventory] = useState(() => {
+    const local = localStorage.getItem("v3_inventory");
+    return local ? JSON.parse(local) : {};
   });
 
+  const [ingredientCategories, setIngredientCategories] = useState(() => {
+    const local = localStorage.getItem("v3_categories");
+    return local ? JSON.parse(local) : {};
+  });
+
+  // UI States
   const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
-  
-  const [inventory, setInventory] = useState({});
   const [inventorySearch, setInventorySearch] = useState("");
-  const [inventoryLoading, setInventoryLoading] = useState(true);
-
+  const [isSyncing, setIsSyncing] = useState(false);
   const [extraShoppingItems, setExtraShoppingItems] = useState([]);
   const [extraShoppingInput, setExtraShoppingInput] = useState("");
-  
-  const allDishes = useMemo(() => [...DEFAULT_DISHES, ...customDishes], [customDishes]);
-  const masterIngredients = useMemo(() => getMasterIngredientList(allDishes), [allDishes]);
+  const [generatedMenu, setGeneratedMenu] = useState(null);
+  const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
 
-  // SCROLL REFS
+  const hasFetched = useRef(false);
   const menuRef = useRef(null);
   const mainRef = useRef(null);
   const sideRef = useRef(null);
   const vegRef = useRef(null);
   const shareRef = useRef(null);
-  
-  // FIX: Add a lock to ensure Cloud Sync only happens once per session!
-  const hasFetchedInventory = useRef(false);
 
-  // CLOUD LOAD
+  // Derived master list based on actual inventory keys
+  const masterIngredients = useMemo(() => Object.keys(inventory).sort(), [inventory]);
+
+  // --- BACKGROUND CLOUD SYNC ---
   useEffect(() => {
-    // If we already fetched the cloud this session, skip this entire block!
-    if (hasFetchedInventory.current) return;
-    
-    // Set the lock so it never runs again
-    hasFetchedInventory.current = true;
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    setIsSyncing(true);
 
-    const loadCloudInventory = async () => {
+    const syncWithCloud = async () => {
       try {
         const response = await fetch(SCRIPT_URL);
         const cloudData = await response.json();
         
-        let merged = { ...cloudData };
-        let changed = false;
-        
-        masterIngredients.forEach(item => {
-          if (merged[item] === undefined) {
-            merged[item] = true; 
-            changed = true;
-          }
-        });
-
-        for(let key in merged) {
-            if(merged[key] === "FALSE" || merged[key] === "false" || merged[key] === false) merged[key] = false;
-            else merged[key] = true;
+        // 1. Parse Dishes from Sheet
+        if (cloudData.dishes && cloudData.dishes.length > 0) {
+          const parsedDishes = cloudData.dishes.map(d => ({
+            id: d["ID"],
+            name: d["Name"],
+            category: d["Category"],
+            protein: d["Protein"],
+            ingredients: typeof d["Ingredients"] === "string" ? d["Ingredients"].split(",").map(i => i.trim()).filter(i=>i) : [],
+            remarks: d["Remarks"] || "",
+            onePerson: d["One Person"] === true || d["One Person"] === "TRUE" || d["One Person"] === "true"
+          }));
+          setDishes(parsedDishes);
+          localStorage.setItem("v3_dishes", JSON.stringify(parsedDishes));
         }
 
-        setInventory(merged);
-        setInventoryLoading(false);
-
-        if (changed) {
-          fetch(SCRIPT_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(merged)
-          }).catch(err => console.error("Sync back failed", err));
+        // 2. Parse Ingredients from Sheet
+        if (cloudData.ingredients && cloudData.ingredients.length > 0) {
+          const newInv = {};
+          const newCats = {};
+          cloudData.ingredients.forEach(row => {
+            const ingName = row["Ingredient"];
+            if (ingName) {
+              newInv[ingName] = row["In Stock"] === true || row["In Stock"] === "TRUE" || row["In Stock"] === "true";
+              newCats[ingName] = row["Category"] || "Needs Review";
+            }
+          });
+          setInventory(newInv);
+          setIngredientCategories(newCats);
+          localStorage.setItem("v3_inventory", JSON.stringify(newInv));
+          localStorage.setItem("v3_categories", JSON.stringify(newCats));
         }
       } catch (error) {
-        console.error("Cloud load failed. Falling back to local storage.", error);
-        const local = localStorage.getItem("dinnerInventory");
-        if (local) {
-          setInventory(JSON.parse(local));
-        } else {
-          const initial = {};
-          masterIngredients.forEach((item) => (initial[item] = true));
-          setInventory(initial);
-        }
-        setInventoryLoading(false);
+        console.error("Background sync failed:", error);
       }
+      setIsSyncing(false);
     };
     
-    loadCloudInventory();
-  }, [masterIngredients]);
+    syncWithCloud();
+  }, []);
 
-  // Handle inventory toggles
+  // --- ONE TIME BULK MIGRATE BUTTON ---
+  const handleMigrate = async () => {
+    const confirmMigrate = window.confirm("Ready to send all local data to your Google Sheet? (Only do this once!)");
+    if (!confirmMigrate) return;
+
+    // Format dishes for payload
+    const migrateDishes = DEFAULT_DISHES.map(d => ({
+      id: d.id, name: d.name, category: d.category, protein: d.protein, 
+      ingredients: d.ingredients.join(", "), remarks: d.remarks || "", onePerson: d.onePerson || false
+    }));
+
+    // Generate unique ingredients and use the fallback categorizer
+    const allIngs = [...new Set(DEFAULT_DISHES.flatMap(d => d.ingredients))].sort();
+    const migrateIngs = allIngs.map(ing => ({
+      name: ing,
+      category: getIngredientCategory(ing),
+      inStock: inventory[ing] || false // keep existing stock status if available
+    }));
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "bulkMigrate", dishes: migrateDishes, ingredients: migrateIngs })
+      });
+      alert("✅ Data sent! Refreshing your app to download the new cloud data.");
+      localStorage.clear();
+      window.location.reload();
+    } catch(e) {
+      alert("❌ Error sending data.");
+    }
+  };
+
+  // --- ACTIONS ---
   const toggleIngredient = (item) => {
-    const updated = { ...inventory, [item]: !inventory[item] };
-    setInventory(updated); 
-    localStorage.setItem("dinnerInventory", JSON.stringify(updated)); 
+    const newVal = !inventory[item];
+    const updated = { ...inventory, [item]: newVal };
     
+    // Instant UI update
+    setInventory(updated); 
+    localStorage.setItem("v3_inventory", JSON.stringify(updated)); 
+    
+    // Background cloud save
     fetch(SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
+      method: "POST", mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(updated)
+      body: JSON.stringify({ action: "updateInventory", inventory: { [item]: newVal } })
     }).catch(err => console.error("Cloud save failed", err));
   };
 
@@ -257,48 +287,75 @@ export default function DinnerApp() {
       onePerson: newDish.onePerson
     };
     
-    const updatedDishes = [...customDishes, dishToSave];
-    setCustomDishes(updatedDishes);
-    localStorage.setItem("customDishes", JSON.stringify(updatedDishes));
+    // Instant UI Update for Dish
+    const updatedDishes = [...dishes, dishToSave];
+    setDishes(updatedDishes);
+    localStorage.setItem("v3_dishes", JSON.stringify(updatedDishes));
+
+    // Handle any brand new ingredients immediately
+    const updatedInv = { ...inventory };
+    const updatedCats = { ...ingredientCategories };
+    const newIngredientsPayload = {};
+    let hasNewIngs = false;
+
+    dishToSave.ingredients.forEach(ing => {
+      if (inventory[ing] === undefined) {
+        updatedInv[ing] = true;
+        updatedCats[ing] = "Needs Review";
+        newIngredientsPayload[ing] = true;
+        hasNewIngs = true;
+      }
+    });
+
+    if (hasNewIngs) {
+      setInventory(updatedInv);
+      setIngredientCategories(updatedCats);
+      localStorage.setItem("v3_inventory", JSON.stringify(updatedInv));
+      localStorage.setItem("v3_categories", JSON.stringify(updatedCats));
+      
+      // Tell cloud about new ingredients
+      fetch(SCRIPT_URL, {
+        method: "POST", mode: "no-cors",
+        body: JSON.stringify({ action: "updateInventory", inventory: newIngredientsPayload })
+      });
+    }
+
+    // Send new dish to cloud
+    const payloadDish = {
+      id: dishToSave.id, name: dishToSave.name, category: dishToSave.category,
+      protein: dishToSave.protein, ingredients: dishToSave.ingredients.join(", "),
+      remarks: dishToSave.remarks, onePerson: dishToSave.onePerson
+    };
+    
+    fetch(SCRIPT_URL, {
+      method: "POST", mode: "no-cors",
+      body: JSON.stringify({ action: "addDish", dish: payloadDish })
+    });
     
     alert("Dish added successfully!");
     setNewDish({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   };
 
-  const [mode, setMode] = useState("auto");
-  const [generatedMenu, setGeneratedMenu] = useState(null);
-  const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
-
   // AUTO SCROLL LOGIC
   useEffect(() => {
-    if (mode === "auto" && generatedMenu && menuRef.current) {
-      setTimeout(() => menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-    }
+    if (mode === "auto" && generatedMenu && menuRef.current) setTimeout(() => menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, [generatedMenu, mode]);
 
   useEffect(() => {
     if (mode === "manual") {
       if (diningSize === "one") {
-         if (manualMenu.mains.length === 1 && shareRef.current) {
-             setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-         }
+         if (manualMenu.mains.length === 1 && shareRef.current) setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       } else {
           const numMains = diningSize === "xlarge" ? 2 : 1;
           const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
-
-          if (manualMenu.mains.length === numMains && manualMenu.sides.length < numSides && sideRef.current) {
-              setTimeout(() => sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-          } else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg === null && vegRef.current) {
-              setTimeout(() => vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-          } else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null && shareRef.current) {
-              setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-          }
+          if (manualMenu.mains.length === numMains && manualMenu.sides.length < numSides && sideRef.current) setTimeout(() => sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg === null && vegRef.current) setTimeout(() => vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null && shareRef.current) setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       }
     }
   }, [manualMenu, mode, diningSize]);
 
-
-  // --- 4. LOGIC ---
+  // MENU GENERATION LOGIC
   const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
 
   const getMissingIngredients = (menu) => {
@@ -306,9 +363,7 @@ export default function DinnerApp() {
     if (menu.mains) menu.mains.forEach(m => { if(m) required.push(...m.ingredients); });
     if (menu.sides) menu.sides.forEach(s => { if(s) required.push(...s.ingredients); });
     if (menu.veg) required.push(...menu.veg.ingredients);
-    
-    const uniqueRequired = [...new Set(required)];
-    return uniqueRequired.filter(ing => !availableIngredientsList.includes(ing));
+    return [...new Set(required)].filter(ing => !availableIngredientsList.includes(ing));
   };
 
   const handleAutoGenerate = () => {
@@ -321,14 +376,13 @@ export default function DinnerApp() {
         let isValid = true;
 
         if (diningSize === "one") {
-            const onePersonOptions = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
-            if (onePersonOptions.length > 0) {
-              tempMenu.mains.push(getRandomDish(onePersonOptions));
-            } else isValid = false;
+            const onePersonOptions = dishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+            if (onePersonOptions.length > 0) tempMenu.mains.push(getRandomDish(onePersonOptions));
+            else isValid = false;
         } else {
-            const mains = allDishes.filter((d) => d.category === "main");
-            const sides = allDishes.filter((d) => d.category === "side");
-            const vegs = allDishes.filter((d) => d.category === "veg");
+            const mains = dishes.filter(d => d.category === "main");
+            const sides = dishes.filter(d => d.category === "side");
+            const vegs = dishes.filter(d => d.category === "veg");
 
             const numMains = diningSize === "xlarge" ? 2 : 1;
             const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
@@ -351,39 +405,28 @@ export default function DinnerApp() {
                 } else isValid = false;
             }
 
-            const availableVegs = vegs.filter((v) => !usedProteins.includes(v.protein));
-            if (availableVegs.length > 0) {
-              tempMenu.veg = getRandomDish(availableVegs);
-            } else isValid = false;
+            const availableVegs = vegs.filter(v => !usedProteins.includes(v.protein));
+            if (availableVegs.length > 0) tempMenu.veg = getRandomDish(availableVegs);
+            else isValid = false;
         }
 
         if (!isValid) continue;
 
         const missingCount = getMissingIngredients(tempMenu).length;
-        
-        if (missingCount < bestMissingCount) {
-            bestMissingCount = missingCount;
-            bestMenu = tempMenu;
-        }
-        
-        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) {
-            break; 
-        }
+        if (missingCount < bestMissingCount) { bestMissingCount = missingCount; bestMenu = tempMenu; }
+        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
     }
 
     if (bestMenu) {
-      if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
-          alert(`We couldn't find a combo with your exact shopping preference. Here is the closest match! (Missing ${bestMissingCount} items)`);
-      }
+      if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) alert(`We couldn't find a combo with your exact shopping preference. Here is the closest match! (Missing ${bestMissingCount} items)`);
       setGeneratedMenu(bestMenu);
     } else {
-      alert("We couldn't generate a valid menu. Try changing your dining size or adding more dishes!");
+      alert("We couldn't generate a valid menu. Try changing your dining size or adding more dishes to your database!");
     }
   };
 
   const getManualOptions = (type) => {
-    let usedOther = [];
-    let usedSelf = [];
+    let usedOther = []; let usedSelf = [];
 
     if (type === 'main') {
       manualMenu.sides.forEach(s => { if(s && s.protein !== "none" && s.protein !== "seafood") usedOther.push(s.protein); });
@@ -396,16 +439,12 @@ export default function DinnerApp() {
       manualMenu.sides.forEach(s => { if(s && s.protein !== "none" && s.protein !== "seafood") usedOther.push(s.protein); });
     }
 
-    let pool = allDishes.filter(d => d.category === type);
-    if (diningSize === "one") pool = allDishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+    let pool = dishes.filter(d => d.category === type);
+    if (diningSize === "one") pool = dishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
 
     return pool.filter(d => {
        if (usedOther.includes(d.protein)) return false;
-       
-       const isSelectedSelf = (type === 'main' && manualMenu.mains.find(m => m.id === d.id)) ||
-                              (type === 'side' && manualMenu.sides.find(s => s.id === d.id)) ||
-                              (type === 'veg' && manualMenu.veg?.id === d.id);
-                              
+       const isSelectedSelf = (type === 'main' && manualMenu.mains.find(m => m.id === d.id)) || (type === 'side' && manualMenu.sides.find(s => s.id === d.id)) || (type === 'veg' && manualMenu.veg?.id === d.id);
        if (!isSelectedSelf && usedSelf.includes(d.protein)) return false;
 
        const simulatedMenu = { mains: [...manualMenu.mains], sides: [...manualMenu.sides], veg: manualMenu.veg };
@@ -431,20 +470,11 @@ export default function DinnerApp() {
   };
 
   const toggleManualSelection = (type, dish, maxLimit) => {
-    if (type === 'veg') {
-      setManualMenu({...manualMenu, veg: manualMenu.veg?.id === dish.id ? null : dish});
-      return;
-    }
-
+    if (type === 'veg') { setManualMenu({...manualMenu, veg: manualMenu.veg?.id === dish.id ? null : dish}); return; }
     let current = [...manualMenu[type]];
     const index = current.findIndex(item => item && item.id === dish.id);
-    
-    if (index >= 0) {
-      current.splice(index, 1); 
-    } else {
-      if (current.length >= maxLimit) current.shift(); 
-      current.push(dish); 
-    }
+    if (index >= 0) current.splice(index, 1); 
+    else { if (current.length >= maxLimit) current.shift(); current.push(dish); }
     setManualMenu({...manualMenu, [type]: current});
   };
 
@@ -462,11 +492,10 @@ export default function DinnerApp() {
       text += `\n*Shopping List*\n`;
       finalShoppingList.forEach((item) => (text += `☐ ${item}\n`));
     }
-
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
-  // --- 5. UI COMPONENTS & STYLES ---
+  // --- UI COMPONENTS & STYLES ---
   const styles = {
     container: { fontFamily: "system-ui", maxWidth: "500px", margin: "0 auto", padding: "15px", color: "#333" },
     nav: { display: "flex", gap: "8px", marginBottom: "20px", overflowX: "auto", paddingBottom: "5px" },
@@ -487,44 +516,35 @@ export default function DinnerApp() {
     categoryHeader: { fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", color: "#888", marginTop: "15px", marginBottom: "8px" },
     menuCard: { display: "flex", alignItems: "center", gap: "15px", padding: "12px 0", borderBottom: "1px solid #eee" },
     input: { width: "100%", padding: "14px 20px", borderRadius: "20px", border: "1px solid #ddd", marginBottom: "15px", boxSizing: "border-box", fontSize: "16px" },
-    loader: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, borderRadius: "16px", fontWeight: "bold", color: "#FF8CA1" }
+    syncingIndicator: { textAlign: "center", color: "#FF8CA1", fontSize: "12px", fontWeight: "bold", marginBottom: "10px", height: "15px" }
   };
 
   const DishIcon = ({ type }) => {
     let emoji = "🍲"; let bgColor = "#FFF0C2"; 
     if (type === "side") { emoji = "🍤"; bgColor = "#D0E8FF"; } 
     if (type === "veg") { emoji = "🥦"; bgColor = "#D4F0D0"; } 
-
     return (
-      <div style={{ 
-        width: "64px", height: "64px", borderRadius: "16px", backgroundColor: bgColor, 
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: "44px", flexShrink: 0 
-      }}>
+      <div style={{ width: "64px", height: "64px", borderRadius: "16px", backgroundColor: bgColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "44px", flexShrink: 0 }}>
         {emoji}
       </div>
     );
   };
 
-  const renderGroupedDishesMulti = (dishes, selectedItemsArray, isSide = false, onSelect) => {
+  const renderGroupedDishesMulti = (dishesPool, selectedItemsArray, isSide = false, onSelect) => {
     const defaultGroups = [
       { id: "pork", label: "Pork" }, { id: "beef", label: "Beef" }, 
       { id: "chicken", label: "Chicken" }, { id: "seafood", label: "Seafood" }, 
       { id: "soy", label: "Soy" }, { id: "none", label: "Veg/Other" }
     ];
-    
-    const sideGroups = [
-      { id: "cold", label: "Cold Dish" }, { id: "egg", label: "Egg" }, ...defaultGroups
-    ];
-
+    const sideGroups = [{ id: "cold", label: "Cold Dish" }, { id: "egg", label: "Egg" }, ...defaultGroups];
     const groupsToUse = isSide ? sideGroups : defaultGroups;
 
     return groupsToUse.map(group => {
-      const filtered = dishes.filter(d => {
+      const filtered = dishesPool.filter(d => {
         const lowerName = d.name.toLowerCase();
         if (isSide) {
           const isCold = lowerName.includes("cold");
           const isEgg = !isCold && (lowerName.includes("steam egg") || lowerName.includes("stir fry egg") || lowerName.includes("fry egg"));
-          
           if (group.id === "cold") return isCold;
           if (group.id === "egg") return isEgg;
           if (isCold || isEgg) return false; 
@@ -539,11 +559,7 @@ export default function DinnerApp() {
           <div style={{ display: "flex", flexWrap: "wrap" }}>
             {filtered.map(d => {
               const isSelected = selectedItemsArray.some(item => item && item.id === d.id);
-              return (
-                <button key={d.id} style={styles.tag(isSelected)} onClick={() => onSelect(d)}>
-                  {formatNameUI(d.name)}
-                </button>
-              );
+              return <button key={d.id} style={styles.tag(isSelected)} onClick={() => onSelect(d)}>{formatNameUI(d.name)}</button>;
             })}
           </div>
         </div>
@@ -554,16 +570,13 @@ export default function DinnerApp() {
   const renderShareSection = (menuToShare) => (
     <>
       <label style={{fontWeight: "bold", fontSize: "16px", display: "block", marginBottom: "8px", marginTop: "10px"}}>🥑 Add extra items to shopping list</label>
-      
       <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
         {extraShoppingItems.map(ing => (
           <span key={ing} style={{ background: "#FF8CA1", color: "white", padding: "6px 12px", borderRadius: "15px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold" }}>
-            {ing} 
-            <button style={{ border: "none", background: "none", cursor: "pointer", color: "white", padding: 0, fontWeight: "bold", fontSize: "16px" }} onClick={() => setExtraShoppingItems(extraShoppingItems.filter(i => i !== ing))}>×</button>
+            {ing} <button style={{ border: "none", background: "none", cursor: "pointer", color: "white", padding: 0, fontWeight: "bold", fontSize: "16px" }} onClick={() => setExtraShoppingItems(extraShoppingItems.filter(i => i !== ing))}>×</button>
           </span>
         ))}
       </div>
-
       <div style={{ position: "relative" }}>
         <input 
           style={{...styles.input, marginBottom: "0"}} 
@@ -584,34 +597,43 @@ export default function DinnerApp() {
               <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
                 if(!extraShoppingItems.includes(sug)) setExtraShoppingItems([...extraShoppingItems, sug]);
                 setExtraShoppingInput("");
-              }}>
-                {sug}
-              </div>
+              }}>{sug}</div>
             ))}
             {!masterIngredients.includes(extraShoppingInput.trim().toLowerCase()) && (
               <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
                 setExtraShoppingItems([...extraShoppingItems, extraShoppingInput.trim().toLowerCase()]);
                 setExtraShoppingInput("");
-              }}>
-                + Add new: "{extraShoppingInput}"
-              </div>
+              }}>+ Add new: "{extraShoppingInput}"</div>
             )}
           </div>
         )}
       </div>
-
       <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginTop: "20px"}} onClick={() => handleShare(menuToShare)}>Send to WhatsApp</button>
     </>
   );
 
-  const inventoryCategories = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Fruits", "Nuts", "Grains & Wrappers", "Condiments"];
-  
   const numMains = diningSize === "xlarge" ? 2 : 1;
   const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
 
+  // Render check: Are we totally empty? (Only happens on very first launch)
+  const isDatabaseEmpty = dishes.length === 0;
+
   return (
     <div style={styles.container}>
-      <h2 style={{ textAlign: "center", color: "#FF8CA1", margin: "10px 0 20px 0" }}>🍽️ Dinner Planner</h2>
+      <h2 style={{ textAlign: "center", color: "#FF8CA1", margin: "10px 0 5px 0" }}>🍽️ Dinner Planner</h2>
+      
+      {/* Background sync indicator (subtle) */}
+      <div style={styles.syncingIndicator}>
+        {isSyncing ? "Syncing with cloud... ☁️" : ""}
+      </div>
+
+      {isDatabaseEmpty && !isSyncing && (
+        <div style={{...styles.block, background: "#fff0f0", border: "2px solid red", textAlign: "center"}}>
+          <h3 style={{color: "red", marginTop: 0}}>Database Migration Required!</h3>
+          <p>Please click this button once to send all your data to your new Google Sheets Database.</p>
+          <button style={{...styles.btn, background: "red"}} onClick={handleMigrate}>🚨 One-Time Setup: Send Data</button>
+        </div>
+      )}
       
       <div style={styles.nav}>
         <button style={styles.tag(activeTab === "planner")} onClick={() => setActiveTab("planner")}>Meal Planner</button>
@@ -619,43 +641,34 @@ export default function DinnerApp() {
         <button style={styles.tag(activeTab === "add")} onClick={() => setActiveTab("add")}>+ Add Dish</button>
       </div>
 
-      {activeTab === "add" && (
+      {activeTab === "add" && !isDatabaseEmpty && (
         <div style={styles.block}>
           <h3 style={{ marginTop: 0 }}>Add a New Dish</h3>
-          
           <label style={{fontWeight: "bold", fontSize: "14px"}}>Dish Name</label>
           <input style={styles.input} placeholder="Name a dish..." value={newDish.name} onChange={e => setNewDish({...newDish, name: e.target.value})} />
-
           <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Category</label>
           <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
             {["main", "side", "veg"].map(cat => (
               <button key={cat} style={styles.tag(newDish.category === cat)} onClick={() => setNewDish({...newDish, category: cat})}>{cat.toUpperCase()}</button>
             ))}
           </div>
-
           <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Main Protein (Optional)</label>
           <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
             {["pork", "beef", "chicken", "seafood", "soy"].map(pro => (
               <button key={pro} style={styles.tag(newDish.protein === pro)} onClick={() => setNewDish({...newDish, protein: newDish.protein === pro ? "" : pro})}>{pro.toUpperCase()}</button>
             ))}
           </div>
-
           <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Ingredients</label>
-          
           <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
             {newDish.ingredients.map(ing => (
               <span key={ing} style={{ background: "#FF8CA1", color: "white", padding: "6px 12px", borderRadius: "15px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold" }}>
-                {ing} 
-                <button style={{ border: "none", background: "none", cursor: "pointer", color: "white", padding: 0, fontWeight: "bold", fontSize: "16px" }} onClick={() => setNewDish({...newDish, ingredients: newDish.ingredients.filter(i => i !== ing)})}>×</button>
+                {ing} <button style={{ border: "none", background: "none", cursor: "pointer", color: "white", padding: 0, fontWeight: "bold", fontSize: "16px" }} onClick={() => setNewDish({...newDish, ingredients: newDish.ingredients.filter(i => i !== ing)})}>×</button>
               </span>
             ))}
           </div>
-
           <div style={{ position: "relative" }}>
             <input 
-              style={{...styles.input, marginBottom: "0"}} 
-              placeholder="Type an ingredient & press enter..." 
-              value={ingredientInput} 
+              style={{...styles.input, marginBottom: "0"}} placeholder="Type an ingredient & press enter..." value={ingredientInput} 
               onChange={e => setIngredientInput(e.target.value)}
               onKeyDown={e => {
                 if(e.key === 'Enter' && ingredientInput.trim()) {
@@ -671,114 +684,65 @@ export default function DinnerApp() {
                   <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
                     if(!newDish.ingredients.includes(sug)) setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
                     setIngredientInput("");
-                  }}>
-                    {sug}
-                  </div>
+                  }}>{sug}</div>
                 ))}
                 {!masterIngredients.includes(ingredientInput.trim().toLowerCase()) && (
                   <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
                     setNewDish({...newDish, ingredients: [...newDish.ingredients, ingredientInput.trim().toLowerCase()]});
                     setIngredientInput("");
-                  }}>
-                    + Add new: "{ingredientInput}"
-                  </div>
+                  }}>+ Add new: "{ingredientInput}"</div>
                 )}
               </div>
             )}
           </div>
-
           <div style={{marginTop: "15px"}}>
             <label style={{fontWeight: "bold", fontSize: "14px"}}>Remarks (Optional)</label>
             <input style={styles.input} placeholder="Cookbook p.92..." value={newDish.remarks} onChange={e => setNewDish({...newDish, remarks: e.target.value})} />
           </div>
-
           <div style={{marginTop: "10px", marginBottom: "20px"}}>
             <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "500", fontSize: "14px" }}>
               <input type="checkbox" checked={newDish.onePerson} onChange={(e) => setNewDish({...newDish, onePerson: e.target.checked})} style={{ width: "20px", height: "20px", accentColor: "#FF8CA1" }}/>
               Great for One Person meals
             </label>
           </div>
-
           <button style={styles.btn} onClick={handleAddDish}>Save Dish</button>
         </div>
       )}
 
-      {activeTab === "inventory" && (
+      {activeTab === "inventory" && !isDatabaseEmpty && (
         <div style={{ position: "relative" }}>
-          {inventoryLoading && <div style={{...styles.loader, background: "transparent", position: "relative", padding: "20px"}}>Teleporting to your kitchen... 🪄🍳</div>}
-          
-          {!inventoryLoading && (
-            <>
-              <input 
-                style={{...styles.input, marginBottom: '20px'}} 
-                placeholder="🔍 Search ingredients..." 
-                value={inventorySearch}
-                onChange={e => setInventorySearch(e.target.value)}
-              />
-
-              {inventoryCategories.map(category => {
-                const itemsInCategory = masterIngredients.filter(item => getIngredientCategory(item) === category);
-                const searchedItems = itemsInCategory.filter(item => item.toLowerCase().includes(inventorySearch.toLowerCase()));
-                
-                if (searchedItems.length === 0) return null; 
-                
-                return (
-                  <div key={category} style={styles.block}>
-                    <h3 style={{ marginTop: 0, color: "#444" }}>{category}</h3>
-                    <div style={{ display: "flex", flexWrap: "wrap" }}>
-                      {searchedItems.map((item) => (
-                        <button
-                          key={item}
-                          style={{...styles.tag(inventory[item]), borderColor: inventory[item] ? '#FF8CA1' : '#ddd', color: inventory[item] ? 'white' : '#aaa'}}
-                          onClick={() => toggleIngredient(item)}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
+          <input style={{...styles.input, marginBottom: '20px'}} placeholder="🔍 Search ingredients..." value={inventorySearch} onChange={e => setInventorySearch(e.target.value)} />
+          {CATEGORY_ORDER.map(category => {
+            const itemsInCategory = masterIngredients.filter(item => ingredientCategories[item] === category);
+            const searchedItems = itemsInCategory.filter(item => item.toLowerCase().includes(inventorySearch.toLowerCase()));
+            if (searchedItems.length === 0) return null; 
+            return (
+              <div key={category} style={styles.block}>
+                <h3 style={{ marginTop: 0, color: "#444" }}>{category}</h3>
+                <div style={{ display: "flex", flexWrap: "wrap" }}>
+                  {searchedItems.map((item) => (
+                    <button key={item} style={{...styles.tag(inventory[item]), borderColor: inventory[item] ? '#FF8CA1' : '#ddd', color: inventory[item] ? 'white' : '#aaa'}} onClick={() => toggleIngredient(item)}>{item}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {activeTab === "planner" && (
+      {activeTab === "planner" && !isDatabaseEmpty && (
         <div style={{ position: "relative" }}>
-          {inventoryLoading && <div style={styles.loader}>Teleporting to your kitchen... 🪄🍳</div>}
           <div style={styles.block}>
-            <label style={{ fontWeight: "bold", display: "block", textAlign: "center", marginBottom: "10px", fontSize: "16px" }}>
-              Dining Size
-            </label>
+            <label style={{ fontWeight: "bold", display: "block", textAlign: "center", marginBottom: "10px", fontSize: "16px" }}>Dining Size</label>
             <div style={{ display: "flex", justifyContent: "center", gap: "5px", flexWrap: "wrap" }}>
-              {[
-                { id: "one", label: "1" },
-                { id: "small", label: "2" },
-                { id: "medium", label: "3" },
-                { id: "large", label: "4" },
-                { id: "xlarge", label: "5+" }
-              ].map(size => (
-                <button 
-                  key={size.id} 
-                  style={styles.tag(diningSize === size.id)} 
-                  onClick={() => {
-                    setDiningSize(size.id);
-                    setManualMenu({ mains: [], sides: [], veg: null });
-                  }}
-                >
-                  {size.label}
-                </button>
+              {[{ id: "one", label: "1" }, { id: "small", label: "2" }, { id: "medium", label: "3" }, { id: "large", label: "4" }, { id: "xlarge", label: "5+" }].map(size => (
+                <button key={size.id} style={styles.tag(diningSize === size.id)} onClick={() => { setDiningSize(size.id); setManualMenu({ mains: [], sides: [], veg: null }); }}>{size.label}</button>
               ))}
             </div>
             
             <div style={{ marginTop: "20px" }}>
-              <label style={{ fontWeight: "bold", display: "block", textAlign: "center", marginBottom: "10px", fontSize: "16px" }}>
-                Shopping Preference
-              </label>
+              <label style={{ fontWeight: "bold", display: "block", textAlign: "center", marginBottom: "10px", fontSize: "16px" }}>Shopping Preference</label>
               <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
-                
-                {/* --- NORMAL CART --- */}
                 <button style={styles.iconBtn(shoppingMode === "any")} onClick={() => setShoppingMode("any")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
@@ -791,8 +755,6 @@ export default function DinnerApp() {
                     <line x1="8" y1="13" x2="19" y2="13" />
                   </svg>
                 </button>
-
-                {/* --- MINIMAL CART --- */}
                 <button style={styles.iconBtn(shoppingMode === "minimal")} onClick={() => setShoppingMode("minimal")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
@@ -802,8 +764,6 @@ export default function DinnerApp() {
                     <circle cx="15.5" cy="14" r="2.5" fill="currentColor" stroke="none" />
                   </svg>
                 </button>
-
-                {/* --- NO SHOPPING CART --- */}
                 <button style={styles.iconBtn(shoppingMode === "none")} onClick={() => setShoppingMode("none")}>
                   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 3h2l2.5 12.5A2 2 0 0 0 9.5 17h8a2 2 0 0 0 1.9-1.5L21 6H6" />
@@ -811,7 +771,6 @@ export default function DinnerApp() {
                     <circle cx="18" cy="20.5" r="1.5" />
                   </svg>
                 </button>
-
               </div>
             </div>
           </div>
@@ -820,44 +779,20 @@ export default function DinnerApp() {
             <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>💡 Surprise me</button>
             <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => {
               setMode("manual");
-              setTimeout(() => {
-                if (mainRef.current) mainRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }, 100);
+              setTimeout(() => { if (mainRef.current) mainRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
             }}>💭 Let me think</button>
           </div>
 
           {mode === "auto" && (
             <div>
               <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
-              
               {generatedMenu && (
                 <div ref={menuRef} style={{...styles.block, marginTop: "20px"}}>
                   <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
-                  
-                  {generatedMenu.mains.map((m, i) => (
-                    <div style={styles.menuCard} key={`auto-m-${i}`}>
-                      <DishIcon type="main" />
-                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
-                    </div>
-                  ))}
-                  
-                  {generatedMenu.sides.map((s, i) => (
-                    <div style={styles.menuCard} key={`auto-s-${i}`}>
-                      <DishIcon type="side" />
-                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
-                    </div>
-                  ))}
-
-                  {generatedMenu.veg && (
-                    <div style={{...styles.menuCard, borderBottom: "none"}}>
-                      <DishIcon type="veg" />
-                      <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
-                    </div>
-                  )}
-
-                  <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #eee" }}>
-                    {renderShareSection(generatedMenu)}
-                  </div>
+                  {generatedMenu.mains.map((m, i) => (<div style={styles.menuCard} key={`auto-m-${i}`}><DishIcon type="main" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div></div>))}
+                  {generatedMenu.sides.map((s, i) => (<div style={styles.menuCard} key={`auto-s-${i}`}><DishIcon type="side" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div></div>))}
+                  {generatedMenu.veg && (<div style={{...styles.menuCard, borderBottom: "none"}}><DishIcon type="veg" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div></div>)}
+                  <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #eee" }}>{renderShareSection(generatedMenu)}</div>
                 </div>
               )}
             </div>
@@ -876,26 +811,20 @@ export default function DinnerApp() {
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? `(Pick ${numMains})` : ''}</h3></div>
                     {renderGroupedDishesMulti(getManualOptions('main'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))}
                   </div>
-
                   {numSides > 0 && (
                     <div style={styles.block} ref={sideRef}>
                       <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
                       {renderGroupedDishesMulti(getManualOptions('side'), manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))}
                     </div>
                   )}
-
                   <div style={styles.block} ref={vegRef}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: "0", fontSize: "20px" }}>Select Vegetable</h3></div>
                     {renderGroupedDishesMulti(getManualOptions('veg'), [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))}
                   </div>
                 </>
               )}
-
-              {((diningSize === "one" && manualMenu.mains.length === 1) || 
-                (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
-                <div style={{...styles.block, marginBottom: "30px"}} ref={shareRef}>
-                  {renderShareSection(manualMenu)}
-                </div>
+              {((diningSize === "one" && manualMenu.mains.length === 1) || (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
+                <div style={{...styles.block, marginBottom: "30px"}} ref={shareRef}>{renderShareSection(manualMenu)}</div>
               )}
             </div>
           )}
