@@ -180,16 +180,18 @@ export default function DinnerApp() {
       });
     }
 
-    // Send new dish to cloud
+      // Send new dish to cloud
     const payloadDish = {
       id: dishToSave.id, name: dishToSave.name, category: dishToSave.category,
       protein: dishToSave.protein, ingredients: dishToSave.ingredients.join(", "),
-      remarks: dishToSave.remarks, onePerson: dishToSave.onePerson
+      remarks: dishToSave.remarks, 
+      onePerson: dishToSave.onePerson ? "TRUE" : "FALSE" 
     };
     
     fetch(SCRIPT_URL, {
       method: "POST", mode: "no-cors",
-      body: JSON.stringify({ action: "addDish", dish: payloadDish })
+      body: JSON.stringify({ action: "addDish", dish: 
+        payloadDish })
     });
     
     alert("Dish added successfully!");
@@ -481,7 +483,7 @@ export default function DinnerApp() {
       
       {/* Background sync indicator */}
       <div style={styles.syncingIndicator}>
-        {isSyncing ? "Syncing with cloud... ☁️" : ""}
+        {isSyncing ? "Teleporting to your kitchen... 🪄🍳" : ""}
       </div>
       
       <div style={styles.nav}>
