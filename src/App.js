@@ -145,7 +145,12 @@ export default function DinnerApp() {
   const [diningSize, setDiningSize] = useState("medium"); 
   const [shoppingMode, setShoppingMode] = useState("any"); 
   
-  const [customDishes, setCustomDishes] = useState([]);
+  // FIX: Load custom dishes instantly on launch
+  const [customDishes, setCustomDishes] = useState(() => {
+    const savedDishes = localStorage.getItem("customDishes");
+    return savedDishes ? JSON.parse(savedDishes) : [];
+  });
+
   const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
   
@@ -165,11 +170,17 @@ export default function DinnerApp() {
   const sideRef = useRef(null);
   const vegRef = useRef(null);
   const shareRef = useRef(null);
+  
+  // FIX: Add a lock to ensure Cloud Sync only happens once per session!
+  const hasFetchedInventory = useRef(false);
 
   // CLOUD LOAD
   useEffect(() => {
-    const savedDishes = localStorage.getItem("customDishes");
-    if (savedDishes) setCustomDishes(JSON.parse(savedDishes));
+    // If we already fetched the cloud this session, skip this entire block!
+    if (hasFetchedInventory.current) return;
+    
+    // Set the lock so it never runs again
+    hasFetchedInventory.current = true;
 
     const loadCloudInventory = async () => {
       try {
@@ -475,10 +486,7 @@ export default function DinnerApp() {
     btn: { background: "#FF8CA1", color: "white", padding: "16px", border: "none", borderRadius: "14px", width: "100%", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "10px", boxShadow: "0 4px 12px rgba(255, 140, 161, 0.3)" },
     categoryHeader: { fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", color: "#888", marginTop: "15px", marginBottom: "8px" },
     menuCard: { display: "flex", alignItems: "center", gap: "15px", padding: "12px 0", borderBottom: "1px solid #eee" },
-    
-    // UPDATED MASTER INPUT STYLE
     input: { width: "100%", padding: "14px 20px", borderRadius: "20px", border: "1px solid #ddd", marginBottom: "15px", boxSizing: "border-box", fontSize: "16px" },
-    
     loader: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, borderRadius: "16px", fontWeight: "bold", color: "#FF8CA1" }
   };
 
