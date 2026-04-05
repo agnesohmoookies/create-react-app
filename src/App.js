@@ -616,7 +616,7 @@ export default function DinnerApp() {
   const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
 
   // Render check: Are we totally empty? (Only happens on very first launch)
-  const isDatabaseEmpty = dishes.length === 0;
+const isDatabaseEmpty = true; // FORCING THE BUTTON TO SHOW!
 
   return (
     <div style={styles.container}>
