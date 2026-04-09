@@ -7,7 +7,6 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPuEREoE7cGkKzWEF_H
 const formatNameUI = (name) => name ? name.replace(/\s*\(.*?\)/g, '') : "";
 const getRandomDish = (dishes) => dishes[Math.floor(Math.random() * dishes.length)];
 
-// The categorization engine (used to auto-sort brand new ingredients you type in)
 const getIngredientCategory = (item) => {
   const lower = item.toLowerCase();
   const hasWord = (words) => new RegExp(`\\b(${words.join('|')})(s|es)?\\b`, 'i').test(lower);
@@ -29,7 +28,6 @@ const getIngredientCategory = (item) => {
   return "Other Veggies"; 
 };
 
-// Strict display order for categories on the Inventory tab
 const CATEGORY_ORDER = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Fruits", "Nuts", "Grains & Wrappers", "Condiments", "Needs Review"];
 
 export default function DinnerApp() {
@@ -39,7 +37,6 @@ export default function DinnerApp() {
   const [shoppingMode, setShoppingMode] = useState("any"); 
   const [mode, setMode] = useState("auto");
   
-  // Stale-While-Revalidate: Load from LocalStorage instantly
   const [dishes, setDishes] = useState(() => {
     const local = localStorage.getItem("v3_dishes");
     return local ? JSON.parse(local) : [];
@@ -55,7 +52,6 @@ export default function DinnerApp() {
     return local ? JSON.parse(local) : {};
   });
 
-  // UI States
   const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
   const [inventorySearch, setInventorySearch] = useState("");
@@ -64,6 +60,7 @@ export default function DinnerApp() {
   const [extraShoppingInput, setExtraShoppingInput] = useState("");
   const [generatedMenu, setGeneratedMenu] = useState(null);
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
+  const [autoWarning, setAutoWarning] = useState(""); // NEW: Friendly Warning State
 
   const hasFetched = useRef(false);
   const menuRef = useRef(null);
@@ -72,7 +69,6 @@ export default function DinnerApp() {
   const vegRef = useRef(null);
   const shareRef = useRef(null);
 
-  // Derived master list based on actual inventory keys
   const masterIngredients = useMemo(() => Object.keys(inventory).sort(), [inventory]);
 
   // --- BACKGROUND CLOUD SYNC ---
@@ -86,11 +82,9 @@ export default function DinnerApp() {
         const response = await fetch(SCRIPT_URL);
         const cloudData = await response.json();
         
-        // Parse Dishes from Sheet
         if (cloudData.dishes && cloudData.dishes.length > 0) {
           const parsedDishes = cloudData.dishes.map(d => ({
             id: d["ID"], name: d["Name"], category: d["Category"], protein: d["Protein"],
-            // Ensure we strictly trim spaces off ingredients!
             ingredients: typeof d["Ingredients"] === "string" ? d["Ingredients"].split(",").map(i => i.trim()).filter(i=>i) : [],
             remarks: d["Remarks"] || "",
             onePerson: d["One Person"] === true || String(d["One Person"]).toUpperCase() === "TRUE"
@@ -99,13 +93,12 @@ export default function DinnerApp() {
           localStorage.setItem("v3_dishes", JSON.stringify(parsedDishes));
         }
 
-        // Parse Ingredients from Sheet
         if (cloudData.ingredients && cloudData.ingredients.length > 0) {
           const newInv = {}; const newCats = {};
           cloudData.ingredients.forEach(row => {
             const ingName = row["Ingredient"];
             if (ingName) {
-              const trimmedName = String(ingName).trim(); // Keep exact case, just remove invisible spaces
+              const trimmedName = String(ingName).trim(); 
               newInv[trimmedName] = row["In Stock"] === true || String(row["In Stock"]).toUpperCase() === "TRUE";
               newCats[trimmedName] = row["Category"] || "Needs Review";
             }
@@ -129,11 +122,9 @@ export default function DinnerApp() {
     const newVal = !inventory[item];
     const updated = { ...inventory, [item]: newVal };
     
-    // Instant UI update
     setInventory(updated); 
     localStorage.setItem("v3_inventory", JSON.stringify(updated)); 
     
-    // Background cloud save (Strictly passing TRUE/FALSE to protect Checkboxes)
     fetch(SCRIPT_URL, {
       method: "POST", mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -149,12 +140,10 @@ export default function DinnerApp() {
       ingredients: newDish.ingredients, remarks: newDish.remarks.trim(), onePerson: newDish.onePerson
     };
     
-    // Instant UI Update for Dish
     const updatedDishes = [...dishes, dishToSave];
     setDishes(updatedDishes);
     localStorage.setItem("v3_dishes", JSON.stringify(updatedDishes));
 
-    // Handle any brand new ingredients immediately (Case-Insensitive Check!)
     const updatedInv = { ...inventory };
     const updatedCats = { ...ingredientCategories };
     const newIngredientsPayload = {};
@@ -178,14 +167,12 @@ export default function DinnerApp() {
       localStorage.setItem("v3_inventory", JSON.stringify(updatedInv));
       localStorage.setItem("v3_categories", JSON.stringify(updatedCats));
       
-      // Tell cloud about new ingredients
       fetch(SCRIPT_URL, {
         method: "POST", mode: "no-cors",
         body: JSON.stringify({ action: "updateInventory", inventory: newIngredientsPayload })
       });
     }
 
-    // Send new dish to cloud
     const payloadDish = {
       id: dishToSave.id, name: dishToSave.name, category: dishToSave.category,
       protein: dishToSave.protein, ingredients: dishToSave.ingredients.join(", "),
@@ -230,8 +217,6 @@ export default function DinnerApp() {
     if (menu.veg) required.push(...menu.veg.ingredients);
     
     const uniqueRequired = [...new Set(required)];
-    
-    // FIX: Case-Insensitive matching so "Pork Slice" matches "pork slice"!
     const availableLower = availableIngredientsList.map(i => i.trim().toLowerCase());
     
     return uniqueRequired.filter(ing => !availableLower.includes(ing.trim().toLowerCase()));
@@ -289,7 +274,12 @@ export default function DinnerApp() {
     }
 
     if (bestMenu) {
-      if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) alert(`We couldn't find a combo with your exact shopping preference. Here is the closest match! (Missing ${bestMissingCount} items)`);
+      // SET WARNING INSTEAD OF ALERT
+      if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
+        setAutoWarning(`We couldn't find a menu fitting your exact shopping preference. Here is the closest match! (Missing ${bestMissingCount} items)`);
+      } else {
+        setAutoWarning("");
+      }
       setGeneratedMenu(bestMenu);
     } else {
       alert("We couldn't generate a valid menu. Try changing your dining size or adding more dishes to your database!");
@@ -365,6 +355,15 @@ export default function DinnerApp() {
     }
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
+
+  // PRE-CALCULATE MANUAL OPTIONS FOR CLEAN RENDERING
+  const numMains = diningSize === "xlarge" ? 2 : 1;
+  const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
+  
+  const manualOptionsAny = mode === "manual" && diningSize === "one" ? getManualOptions('any') : [];
+  const manualOptionsMain = mode === "manual" && diningSize !== "one" ? getManualOptions('main') : [];
+  const manualOptionsSide = mode === "manual" && diningSize !== "one" && numSides > 0 ? getManualOptions('side') : [];
+  const manualOptionsVeg = mode === "manual" && diningSize !== "one" ? getManualOptions('veg') : [];
 
   // --- UI COMPONENTS & STYLES ---
   const styles = {
@@ -482,9 +481,6 @@ export default function DinnerApp() {
       <button style={{...styles.btn, background: "#34C759", boxShadow: "0 4px 12px rgba(52, 199, 89, 0.3)", marginTop: "20px"}} onClick={() => handleShare(menuToShare)}>Send to WhatsApp</button>
     </>
   );
-
-  const numMains = diningSize === "xlarge" ? 2 : 1;
-  const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
 
   return (
     <div style={styles.container}>
@@ -648,6 +644,11 @@ export default function DinnerApp() {
               <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
               {generatedMenu && (
                 <div ref={menuRef} style={{...styles.block, marginTop: "20px"}}>
+                  {autoWarning && (
+                    <div style={{ backgroundColor: "#FFF0F0", borderLeft: "4px solid #FF8CA1", padding: "10px", marginBottom: "15px", borderRadius: "8px", fontSize: "14px", color: "#333" }}>
+                      <strong>⚠️ Quick Note:</strong> {autoWarning}
+                    </div>
+                  )}
                   <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
                   {generatedMenu.mains.map((m, i) => (<div style={styles.menuCard} key={`auto-m-${i}`}><DishIcon type="main" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div></div>))}
                   {generatedMenu.sides.map((s, i) => (<div style={styles.menuCard} key={`auto-s-${i}`}><DishIcon type="side" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div></div>))}
@@ -663,23 +664,39 @@ export default function DinnerApp() {
               {diningSize === "one" ? (
                 <div style={styles.block} ref={mainRef}>
                   <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
-                  {renderGroupedDishesMulti(getManualOptions('any'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, 1))}
+                  {manualOptionsAny.length === 0 ? (
+                    <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                  ) : (
+                    renderGroupedDishesMulti(manualOptionsAny, manualMenu.mains, false, (d) => toggleManualSelection('mains', d, 1))
+                  )}
                 </div>
               ) : (
                 <>
                   <div style={styles.block} ref={mainRef}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? `(Pick ${numMains})` : ''}</h3></div>
-                    {renderGroupedDishesMulti(getManualOptions('main'), manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))}
+                    {manualOptionsMain.length === 0 ? (
+                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                    ) : (
+                      renderGroupedDishesMulti(manualOptionsMain, manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))
+                    )}
                   </div>
                   {numSides > 0 && (
                     <div style={styles.block} ref={sideRef}>
                       <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
-                      {renderGroupedDishesMulti(getManualOptions('side'), manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))}
+                      {manualOptionsSide.length === 0 ? (
+                        <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                      ) : (
+                        renderGroupedDishesMulti(manualOptionsSide, manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))
+                      )}
                     </div>
                   )}
                   <div style={styles.block} ref={vegRef}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: "0", fontSize: "20px" }}>Select Vegetable</h3></div>
-                    {renderGroupedDishesMulti(getManualOptions('veg'), [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))}
+                    {manualOptionsVeg.length === 0 ? (
+                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                    ) : (
+                      renderGroupedDishesMulti(manualOptionsVeg, [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))
+                    )}
                   </div>
                 </>
               )}
