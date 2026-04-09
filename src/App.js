@@ -90,9 +90,10 @@ export default function DinnerApp() {
         if (cloudData.dishes && cloudData.dishes.length > 0) {
           const parsedDishes = cloudData.dishes.map(d => ({
             id: d["ID"], name: d["Name"], category: d["Category"], protein: d["Protein"],
+            // Ensure we strictly trim spaces off ingredients!
             ingredients: typeof d["Ingredients"] === "string" ? d["Ingredients"].split(",").map(i => i.trim()).filter(i=>i) : [],
             remarks: d["Remarks"] || "",
-            onePerson: d["One Person"] === true || d["One Person"] === "TRUE" || d["One Person"] === "true"
+            onePerson: d["One Person"] === true || String(d["One Person"]).toUpperCase() === "TRUE"
           }));
           setDishes(parsedDishes);
           localStorage.setItem("v3_dishes", JSON.stringify(parsedDishes));
@@ -104,8 +105,9 @@ export default function DinnerApp() {
           cloudData.ingredients.forEach(row => {
             const ingName = row["Ingredient"];
             if (ingName) {
-              newInv[ingName] = row["In Stock"] === true || row["In Stock"] === "TRUE" || row["In Stock"] === "true";
-              newCats[ingName] = row["Category"] || "Needs Review";
+              const trimmedName = String(ingName).trim(); // Keep exact case, just remove invisible spaces
+              newInv[trimmedName] = row["In Stock"] === true || String(row["In Stock"]).toUpperCase() === "TRUE";
+              newCats[trimmedName] = row["Category"] || "Needs Review";
             }
           });
           setInventory(newInv);
@@ -131,11 +133,11 @@ export default function DinnerApp() {
     setInventory(updated); 
     localStorage.setItem("v3_inventory", JSON.stringify(updated)); 
     
-    // Background cloud save
+    // Background cloud save (Strictly passing TRUE/FALSE to protect Checkboxes)
     fetch(SCRIPT_URL, {
       method: "POST", mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "updateInventory", inventory: { [item]: newVal } })
+      body: JSON.stringify({ action: "updateInventory", inventory: { [item]: newVal ? "TRUE" : "FALSE" } })
     }).catch(err => console.error("Cloud save failed", err));
   };
 
@@ -152,17 +154,20 @@ export default function DinnerApp() {
     setDishes(updatedDishes);
     localStorage.setItem("v3_dishes", JSON.stringify(updatedDishes));
 
-    // Handle any brand new ingredients immediately
+    // Handle any brand new ingredients immediately (Case-Insensitive Check!)
     const updatedInv = { ...inventory };
     const updatedCats = { ...ingredientCategories };
     const newIngredientsPayload = {};
     let hasNewIngs = false;
 
     dishToSave.ingredients.forEach(ing => {
-      if (inventory[ing] === undefined) {
-        updatedInv[ing] = true;
-        updatedCats[ing] = getIngredientCategory(ing); // Auto-guess category for new items
-        newIngredientsPayload[ing] = true;
+      const trimmedIng = ing.trim();
+      const existingKey = Object.keys(inventory).find(k => k.toLowerCase() === trimmedIng.toLowerCase());
+      
+      if (!existingKey) {
+        updatedInv[trimmedIng] = true;
+        updatedCats[trimmedIng] = getIngredientCategory(trimmedIng); 
+        newIngredientsPayload[trimmedIng] = "TRUE";
         hasNewIngs = true;
       }
     });
@@ -180,18 +185,16 @@ export default function DinnerApp() {
       });
     }
 
-      // Send new dish to cloud
+    // Send new dish to cloud
     const payloadDish = {
       id: dishToSave.id, name: dishToSave.name, category: dishToSave.category,
       protein: dishToSave.protein, ingredients: dishToSave.ingredients.join(", "),
-      remarks: dishToSave.remarks, 
-      onePerson: dishToSave.onePerson ? "TRUE" : "FALSE" 
+      remarks: dishToSave.remarks, onePerson: dishToSave.onePerson ? "TRUE" : "FALSE"
     };
     
     fetch(SCRIPT_URL, {
       method: "POST", mode: "no-cors",
-      body: JSON.stringify({ action: "addDish", dish: 
-        payloadDish })
+      body: JSON.stringify({ action: "addDish", dish: payloadDish })
     });
     
     alert("Dish added successfully!");
@@ -225,7 +228,13 @@ export default function DinnerApp() {
     if (menu.mains) menu.mains.forEach(m => { if(m) required.push(...m.ingredients); });
     if (menu.sides) menu.sides.forEach(s => { if(s) required.push(...s.ingredients); });
     if (menu.veg) required.push(...menu.veg.ingredients);
-    return [...new Set(required)].filter(ing => !availableIngredientsList.includes(ing));
+    
+    const uniqueRequired = [...new Set(required)];
+    
+    // FIX: Case-Insensitive matching so "Pork Slice" matches "pork slice"!
+    const availableLower = availableIngredientsList.map(i => i.trim().toLowerCase());
+    
+    return uniqueRequired.filter(ing => !availableLower.includes(ing.trim().toLowerCase()));
   };
 
   const handleAutoGenerate = () => {
@@ -455,13 +464,13 @@ export default function DinnerApp() {
         />
         {extraShoppingInput && (
           <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-            {masterIngredients.filter(i => i.includes(extraShoppingInput.toLowerCase())).slice(0, 5).map(sug => (
+            {masterIngredients.filter(i => i.toLowerCase().includes(extraShoppingInput.toLowerCase())).slice(0, 5).map(sug => (
               <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
                 if(!extraShoppingItems.includes(sug)) setExtraShoppingItems([...extraShoppingItems, sug]);
                 setExtraShoppingInput("");
               }}>{sug}</div>
             ))}
-            {!masterIngredients.includes(extraShoppingInput.trim().toLowerCase()) && (
+            {!masterIngredients.find(i => i.toLowerCase() === extraShoppingInput.trim().toLowerCase()) && (
               <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
                 setExtraShoppingItems([...extraShoppingItems, extraShoppingInput.trim().toLowerCase()]);
                 setExtraShoppingInput("");
@@ -531,13 +540,13 @@ export default function DinnerApp() {
             />
             {ingredientInput && (
               <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, border: "1px solid #ddd", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: "150px", overflowY: "auto", background: "#fff", padding: "5px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-                {masterIngredients.filter(i => i.includes(ingredientInput.toLowerCase())).slice(0, 5).map(sug => (
+                {masterIngredients.filter(i => i.toLowerCase().includes(ingredientInput.toLowerCase())).slice(0, 5).map(sug => (
                   <div key={sug} style={{ padding: "10px", cursor: "pointer", borderBottom: "1px solid #eee" }} onClick={() => {
                     if(!newDish.ingredients.includes(sug)) setNewDish({...newDish, ingredients: [...newDish.ingredients, sug]});
                     setIngredientInput("");
                   }}>{sug}</div>
                 ))}
-                {!masterIngredients.includes(ingredientInput.trim().toLowerCase()) && (
+                {!masterIngredients.find(i => i.toLowerCase() === ingredientInput.trim().toLowerCase()) && (
                   <div style={{ padding: "10px", cursor: "pointer", color: "#FF8CA1", fontWeight: "bold" }} onClick={() => {
                     setNewDish({...newDish, ingredients: [...newDish.ingredients, ingredientInput.trim().toLowerCase()]});
                     setIngredientInput("");
