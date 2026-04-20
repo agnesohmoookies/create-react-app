@@ -55,12 +55,13 @@ export default function DinnerApp() {
   const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
   const [inventorySearch, setInventorySearch] = useState("");
+  const [manualSearch, setManualSearch] = useState(""); // NEW: Search state for Manual mode
   const [isSyncing, setIsSyncing] = useState(false);
   const [extraShoppingItems, setExtraShoppingItems] = useState([]);
   const [extraShoppingInput, setExtraShoppingInput] = useState("");
   const [generatedMenu, setGeneratedMenu] = useState(null);
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
-  const [autoWarning, setAutoWarning] = useState(""); // NEW: Friendly Warning State
+  const [autoWarning, setAutoWarning] = useState(""); 
 
   const hasFetched = useRef(false);
   const menuRef = useRef(null);
@@ -84,8 +85,9 @@ export default function DinnerApp() {
         
         if (cloudData.dishes && cloudData.dishes.length > 0) {
           const parsedDishes = cloudData.dishes.map(d => ({
-            id: d["ID"], name: d["Name"], category: d["Category"], protein: d["Protein"],
-            ingredients: typeof d["Ingredients"] === "string" ? d["Ingredients"].split(",").map(i => i.trim()).filter(i=>i) : [],
+            id: d["ID"], name: d["Name"], category: String(d["Category"] || "main").trim().toLowerCase(), 
+            protein: String(d["Protein"] || "none").trim().toLowerCase(),
+            ingredients: typeof d["Ingredients"] === "string" ? d["Ingredients"].split(",").map(i => i.trim().toLowerCase()).filter(i=>i) : [],
             remarks: d["Remarks"] || "",
             onePerson: d["One Person"] === true || String(d["One Person"]).toUpperCase() === "TRUE"
           }));
@@ -274,9 +276,8 @@ export default function DinnerApp() {
     }
 
     if (bestMenu) {
-      // SET WARNING INSTEAD OF ALERT
       if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
-        setAutoWarning(`We couldn't find a menu fitting your exact shopping preference. Here is the closest match! (Missing ${bestMissingCount} items)`);
+        setAutoWarning(`We couldn't find a perfect match for your pantry. Here is the closest option! (Missing ${bestMissingCount} items)`);
       } else {
         setAutoWarning("");
       }
@@ -360,10 +361,17 @@ export default function DinnerApp() {
   const numMains = diningSize === "xlarge" ? 2 : 1;
   const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
   
-  const manualOptionsAny = mode === "manual" && diningSize === "one" ? getManualOptions('any') : [];
-  const manualOptionsMain = mode === "manual" && diningSize !== "one" ? getManualOptions('main') : [];
-  const manualOptionsSide = mode === "manual" && diningSize !== "one" && numSides > 0 ? getManualOptions('side') : [];
-  const manualOptionsVeg = mode === "manual" && diningSize !== "one" ? getManualOptions('veg') : [];
+  // NEW: Filter helper for the manual search bar
+  const filterBySearch = (options) => {
+    if (!manualSearch.trim()) return options;
+    const lowerSearch = manualSearch.toLowerCase();
+    return options.filter(d => d.name.toLowerCase().includes(lowerSearch));
+  };
+
+  const manualOptionsAny = mode === "manual" && diningSize === "one" ? filterBySearch(getManualOptions('any')) : [];
+  const manualOptionsMain = mode === "manual" && diningSize !== "one" ? filterBySearch(getManualOptions('main')) : [];
+  const manualOptionsSide = mode === "manual" && diningSize !== "one" && numSides > 0 ? filterBySearch(getManualOptions('side')) : [];
+  const manualOptionsVeg = mode === "manual" && diningSize !== "one" ? filterBySearch(getManualOptions('veg')) : [];
 
   // --- UI COMPONENTS & STYLES ---
   const styles = {
@@ -486,7 +494,6 @@ export default function DinnerApp() {
     <div style={styles.container}>
       <h2 style={{ textAlign: "center", color: "#FF8CA1", margin: "10px 0 5px 0" }}>🍽️ Dinner Planner</h2>
       
-      {/* Background sync indicator */}
       <div style={styles.syncingIndicator}>
         {isSyncing ? "Teleporting to your kitchen... 🪄🍳" : ""}
       </div>
@@ -644,9 +651,11 @@ export default function DinnerApp() {
               <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
               {generatedMenu && (
                 <div ref={menuRef} style={{...styles.block, marginTop: "20px"}}>
+                  {/* BOLD NEW WARNING BOX */}
                   {autoWarning && (
-                    <div style={{ backgroundColor: "#FFF0F0", borderLeft: "4px solid #FF8CA1", padding: "10px", marginBottom: "15px", borderRadius: "8px", fontSize: "14px", color: "#333" }}>
-                      <strong>⚠️ Quick Note:</strong> {autoWarning}
+                    <div style={{ backgroundColor: "#FFE5E5", border: "2px solid #FF4D4D", padding: "15px", marginBottom: "20px", borderRadius: "12px", fontSize: "15px", color: "#990000", textAlign: "center", lineHeight: "1.4" }}>
+                      <strong>⚠️ We couldn't find a perfect match!</strong><br/>
+                      {autoWarning}
                     </div>
                   )}
                   <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
@@ -661,11 +670,19 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
+              {/* SEARCH BAR FOR MANUAL MODE */}
+              <input 
+                style={{...styles.input, marginBottom: '20px'}} 
+                placeholder="🔍 Search dishes..." 
+                value={manualSearch} 
+                onChange={e => setManualSearch(e.target.value)} 
+              />
+              
               {diningSize === "one" ? (
                 <div style={styles.block} ref={mainRef}>
                   <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
                   {manualOptionsAny.length === 0 ? (
-                    <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                    <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
                   ) : (
                     renderGroupedDishesMulti(manualOptionsAny, manualMenu.mains, false, (d) => toggleManualSelection('mains', d, 1))
                   )}
@@ -675,7 +692,7 @@ export default function DinnerApp() {
                   <div style={styles.block} ref={mainRef}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? `(Pick ${numMains})` : ''}</h3></div>
                     {manualOptionsMain.length === 0 ? (
-                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
                     ) : (
                       renderGroupedDishesMulti(manualOptionsMain, manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))
                     )}
@@ -684,7 +701,7 @@ export default function DinnerApp() {
                     <div style={styles.block} ref={sideRef}>
                       <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
                       {manualOptionsSide.length === 0 ? (
-                        <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                        <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
                       ) : (
                         renderGroupedDishesMulti(manualOptionsSide, manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))
                       )}
@@ -693,7 +710,7 @@ export default function DinnerApp() {
                   <div style={styles.block} ref={vegRef}>
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: "0", fontSize: "20px" }}>Select Vegetable</h3></div>
                     {manualOptionsVeg.length === 0 ? (
-                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory. Try changing your shopping cart preference above!</div>
+                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
                     ) : (
                       renderGroupedDishesMulti(manualOptionsVeg, [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))
                     )}
