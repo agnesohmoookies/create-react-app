@@ -55,7 +55,7 @@ export default function DinnerApp() {
   const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
   const [inventorySearch, setInventorySearch] = useState("");
-  const [manualSearch, setManualSearch] = useState(""); // NEW: Search state for Manual mode
+  const [manualSearch, setManualSearch] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [extraShoppingItems, setExtraShoppingItems] = useState([]);
   const [extraShoppingInput, setExtraShoppingInput] = useState("");
@@ -69,6 +69,7 @@ export default function DinnerApp() {
   const sideRef = useRef(null);
   const vegRef = useRef(null);
   const shareRef = useRef(null);
+  const searchRef = useRef(null); // NEW: Anchor for the manual search box
 
   const masterIngredients = useMemo(() => Object.keys(inventory).sort(), [inventory]);
 
@@ -357,11 +358,9 @@ export default function DinnerApp() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
-  // PRE-CALCULATE MANUAL OPTIONS FOR CLEAN RENDERING
   const numMains = diningSize === "xlarge" ? 2 : 1;
   const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
   
-  // NEW: Filter helper for the manual search bar
   const filterBySearch = (options) => {
     if (!manualSearch.trim()) return options;
     const lowerSearch = manualSearch.toLowerCase();
@@ -642,7 +641,7 @@ export default function DinnerApp() {
             <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>💡 Surprise me</button>
             <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => {
               setMode("manual");
-              setTimeout(() => { if (mainRef.current) mainRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+              setTimeout(() => { if (searchRef.current) searchRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
             }}>💭 Let me think</button>
           </div>
 
@@ -651,7 +650,6 @@ export default function DinnerApp() {
               <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
               {generatedMenu && (
                 <div ref={menuRef} style={{...styles.block, marginTop: "20px"}}>
-                  {/* BOLD NEW WARNING BOX */}
                   {autoWarning && (
                     <div style={{ backgroundColor: "#FFE5E5", border: "2px solid #FF4D4D", padding: "15px", marginBottom: "20px", borderRadius: "12px", fontSize: "15px", color: "#990000", textAlign: "center", lineHeight: "1.4" }}>
                       <strong>⚠️ We couldn't find a perfect match!</strong><br/>
@@ -670,13 +668,26 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
-              {/* SEARCH BAR FOR MANUAL MODE */}
-              <input 
-                style={{...styles.input, marginBottom: '20px'}} 
-                placeholder="🔍 Search dishes..." 
-                value={manualSearch} 
-                onChange={e => setManualSearch(e.target.value)} 
-              />
+              {/* SEARCH BAR FOR MANUAL MODE WITH ANCHOR AND CLEAR BUTTON */}
+              <div ref={searchRef} style={{ position: "relative", marginBottom: '20px' }}>
+                <input 
+                  style={{...styles.input, marginBottom: 0, paddingRight: "40px"}} 
+                  placeholder="🔍 Search dishes..." 
+                  value={manualSearch} 
+                  onChange={e => setManualSearch(e.target.value)} 
+                />
+                {manualSearch && (
+                  <button 
+                    onClick={() => setManualSearch("")}
+                    style={{
+                      position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)",
+                      background: "none", border: "none", fontSize: "22px", color: "#aaa", cursor: "pointer", padding: 0
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
               
               {diningSize === "one" ? (
                 <div style={styles.block} ref={mainRef}>
