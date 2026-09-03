@@ -69,7 +69,7 @@ export default function DinnerApp() {
   const sideRef = useRef(null);
   const vegRef = useRef(null);
   const shareRef = useRef(null);
-  const searchRef = useRef(null); // NEW: Anchor for the manual search box
+  const searchRef = useRef(null); 
 
   const masterIngredients = useMemo(() => Object.keys(inventory).sort(), [inventory]);
 
@@ -288,6 +288,65 @@ export default function DinnerApp() {
     }
   };
 
+  // --- NEW: INDIVIDUAL DISH SWAPPING ---
+  const handleSwapDish = (type, index) => {
+    const currentMenu = { ...generatedMenu, mains: [...generatedMenu.mains], sides: [...generatedMenu.sides] };
+    const oldDish = type === 'veg' ? currentMenu.veg : currentMenu[type][index];
+    
+    // Find what proteins the OTHER current dishes are using
+    const otherDishes = [
+       ...(type === 'mains' ? currentMenu.mains.filter((_, i) => i !== index) : currentMenu.mains),
+       ...(type === 'sides' ? currentMenu.sides.filter((_, i) => i !== index) : currentMenu.sides),
+       ...(type === 'veg' ? [] : [currentMenu.veg])
+    ].filter(d => d);
+
+    const usedProteins = otherDishes.map(d => d.protein).filter(p => p !== "none" && p !== "seafood");
+
+    // Get valid candidates
+    let pool = dishes.filter(d => d.category === (type === 'mains' ? 'main' : type === 'sides' ? 'side' : 'veg'));
+    if (diningSize === "one") pool = dishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+
+    let bestCandidate = null;
+    let bestMissingCount = 999;
+    
+    // Shuffle pool to ensure random swap
+    const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
+
+    for (let d of shuffledPool) {
+       if (d.id === oldDish.id) continue; // Don't pick the same dish
+       if (usedProteins.includes(d.protein)) continue; // Don't duplicate proteins
+       
+       const testMenu = { ...currentMenu };
+       if (type === 'veg') testMenu.veg = d;
+       else testMenu[type][index] = d;
+       
+       const missingCount = getMissingIngredients(testMenu).length;
+       if (missingCount < bestMissingCount) {
+           bestMissingCount = missingCount;
+           bestCandidate = d;
+       }
+       
+       // If we found a perfect match based on shopping rules, stop searching immediately
+       if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
+    }
+
+    if (!bestCandidate) {
+       alert("Couldn't find any alternative dishes that fit your current constraints!");
+       return;
+    }
+
+    if (type === 'veg') currentMenu.veg = bestCandidate;
+    else currentMenu[type][index] = bestCandidate;
+    
+    setGeneratedMenu(currentMenu);
+    
+    if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
+       setAutoWarning(`Swapped! (Note: couldn't find a perfect pantry match, missing ${bestMissingCount} items)`);
+    } else {
+       setAutoWarning("");
+    }
+  };
+
   const getManualOptions = (type) => {
     let usedOther = []; let usedSelf = [];
 
@@ -333,11 +392,21 @@ export default function DinnerApp() {
   };
 
   const toggleManualSelection = (type, dish, maxLimit) => {
-    if (type === 'veg') { setManualMenu({...manualMenu, veg: manualMenu.veg?.id === dish.id ? null : dish}); return; }
+    if (type === 'veg') { 
+      setManualMenu({...manualMenu, veg: manualMenu.veg?.id === dish.id ? null : dish}); 
+      if (manualMenu.veg?.id !== dish.id) setManualSearch(""); // INSTANT CLEAR ON SELECT
+      return; 
+    }
+    
     let current = [...manualMenu[type]];
     const index = current.findIndex(item => item && item.id === dish.id);
-    if (index >= 0) current.splice(index, 1); 
-    else { if (current.length >= maxLimit) current.shift(); current.push(dish); }
+    if (index >= 0) {
+      current.splice(index, 1); 
+    } else { 
+      if (current.length >= maxLimit) current.shift(); 
+      current.push(dish); 
+      setManualSearch(""); // INSTANT CLEAR ON SELECT
+    }
     setManualMenu({...manualMenu, [type]: current});
   };
 
@@ -391,7 +460,10 @@ export default function DinnerApp() {
     block: { marginBottom: "20px", padding: "20px", background: "#f9f9f9", borderRadius: "16px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", position: "relative" },
     btn: { background: "#FF8CA1", color: "white", padding: "16px", border: "none", borderRadius: "14px", width: "100%", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "10px", boxShadow: "0 4px 12px rgba(255, 140, 161, 0.3)" },
     categoryHeader: { fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", color: "#888", marginTop: "15px", marginBottom: "8px" },
-    menuCard: { display: "flex", alignItems: "center", gap: "15px", padding: "12px 0", borderBottom: "1px solid #eee" },
+    
+    // NEW: Interactive hover style for swapping dishes
+    menuCard: { display: "flex", alignItems: "center", gap: "15px", padding: "12px 10px", borderBottom: "1px solid #eee", cursor: "pointer", borderRadius: "10px", transition: "0.2s" },
+    
     input: { width: "100%", padding: "14px 20px", borderRadius: "20px", border: "1px solid #ddd", marginBottom: "15px", boxSizing: "border-box", fontSize: "16px" },
     syncingIndicator: { textAlign: "center", color: "#FF8CA1", fontSize: "12px", fontWeight: "bold", marginBottom: "10px", height: "15px" }
   };
@@ -656,10 +728,32 @@ export default function DinnerApp() {
                       {autoWarning}
                     </div>
                   )}
-                  <h3 style={{ marginTop: 0 }}>Tonight's Menu:</h3>
-                  {generatedMenu.mains.map((m, i) => (<div style={styles.menuCard} key={`auto-m-${i}`}><DishIcon type="main" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div></div>))}
-                  {generatedMenu.sides.map((s, i) => (<div style={styles.menuCard} key={`auto-s-${i}`}><DishIcon type="side" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div></div>))}
-                  {generatedMenu.veg && (<div style={{...styles.menuCard, borderBottom: "none"}}><DishIcon type="veg" /><div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div></div>)}
+                  <h3 style={{ marginTop: 0 }}>Tonight's Menu (Tap a dish to swap it!):</h3>
+                  
+                  {generatedMenu.mains.map((m, i) => (
+                    <div style={styles.menuCard} key={`auto-m-${i}`} onClick={() => handleSwapDish('mains', i)}>
+                      <DishIcon type="main" />
+                      <div style={{ flex: 1, fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
+                      <div style={{ fontSize: "20px", color: "#FF8CA1" }}>🔄</div>
+                    </div>
+                  ))}
+                  
+                  {generatedMenu.sides.map((s, i) => (
+                    <div style={styles.menuCard} key={`auto-s-${i}`} onClick={() => handleSwapDish('sides', i)}>
+                      <DishIcon type="side" />
+                      <div style={{ flex: 1, fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
+                      <div style={{ fontSize: "20px", color: "#FF8CA1" }}>🔄</div>
+                    </div>
+                  ))}
+                  
+                  {generatedMenu.veg && (
+                    <div style={{...styles.menuCard, borderBottom: "none"}} onClick={() => handleSwapDish('veg', 0)}>
+                      <DishIcon type="veg" />
+                      <div style={{ flex: 1, fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
+                      <div style={{ fontSize: "20px", color: "#FF8CA1" }}>🔄</div>
+                    </div>
+                  )}
+                  
                   <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #eee" }}>{renderShareSection(generatedMenu)}</div>
                 </div>
               )}
@@ -668,7 +762,6 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
-              {/* SEARCH BAR FOR MANUAL MODE WITH ANCHOR AND CLEAR BUTTON */}
               <div ref={searchRef} style={{ position: "relative", marginBottom: '20px' }}>
                 <input 
                   style={{...styles.input, marginBottom: 0, paddingRight: "40px"}} 
@@ -681,7 +774,8 @@ export default function DinnerApp() {
                     onClick={() => setManualSearch("")}
                     style={{
                       position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)",
-                      background: "none", border: "none", fontSize: "22px", color: "#aaa", cursor: "pointer", padding: 0
+                      background: "none", border: "none", fontSize: "28px", color: "#aaa", cursor: "pointer", padding: 0,
+                      lineHeight: "1"
                     }}
                   >
                     ×
