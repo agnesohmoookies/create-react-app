@@ -72,13 +72,16 @@ export default function DinnerApp() {
   const [ingredientInput, setIngredientInput] = useState("");
   const [inventorySearch, setInventorySearch] = useState("");
   const [manualSearch, setManualSearch] = useState("");
-  const [filterNewOnly, setFilterNewOnly] = useState(false); 
+  const [filterNewOnly, setFilterNewOnly] = useState(true); 
   const [isSyncing, setIsSyncing] = useState(false);
   const [extraShoppingItems, setExtraShoppingItems] = useState([]);
   const [extraShoppingInput, setExtraShoppingInput] = useState("");
   const [generatedMenu, setGeneratedMenu] = useState(null);
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
   const [autoWarning, setAutoWarning] = useState(""); 
+  
+  // NEW: Memory array to prevent immediate auto-generator repetition
+  const [seenAutoDishes, setSeenAutoDishes] = useState([]);
 
   const hasFetched = useRef(false);
   const menuRef = useRef(null);
@@ -89,6 +92,15 @@ export default function DinnerApp() {
   const searchRef = useRef(null); 
 
   const masterIngredients = useMemo(() => Object.keys(inventory).sort(), [inventory]);
+
+  // Helper to determine if a dish is < 30 days old
+  const isNewDish = (d) => {
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    if (!d.id.startsWith("c_")) return false; 
+    const timestamp = parseInt(d.id.split("_")[1]);
+    return !isNaN(timestamp) && (now - timestamp <= thirtyDaysMs);
+  };
 
   // --- BACKGROUND CLOUD SYNC ---
   useEffect(() => {
@@ -220,28 +232,6 @@ export default function DinnerApp() {
     setNewDish({ name: "", category: ["main"], protein: "", ingredients: [], remarks: "", onePerson: false });
   };
 
-  // AUTO SCROLL LOGIC
-  useEffect(() => {
-    if (mode === "auto" && generatedMenu && menuRef.current) setTimeout(() => menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  }, [generatedMenu, mode]);
-
-  useEffect(() => {
-    if (mode === "manual") {
-      if (diningSize === "one") {
-         if (manualMenu.mains.length === 1 && shareRef.current) setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-      } else {
-          const numMains = diningSize === "xlarge" ? 2 : 1;
-          const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
-          if (manualMenu.mains.length === numMains && manualMenu.sides.length < numSides && sideRef.current) setTimeout(() => sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-          else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg === null && vegRef.current) setTimeout(() => vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-          else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null && shareRef.current) setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-      }
-    }
-  }, [manualMenu, mode, diningSize]);
-
-  // MENU GENERATION LOGIC
-  const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
-
   const getMissingIngredients = (menu) => {
     let required = [];
     if (menu.mains) menu.mains.forEach(m => { if(m) required.push(...m.ingredients); });
@@ -249,75 +239,124 @@ export default function DinnerApp() {
     if (menu.veg) required.push(...menu.veg.ingredients);
     
     const uniqueRequired = [...new Set(required)];
+    const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
     const availableLower = availableIngredientsList.map(i => i.trim().toLowerCase());
     
     return uniqueRequired.filter(ing => !availableLower.includes(ing.trim().toLowerCase()));
   };
 
+  // --- SMART GENERATION ENGINE ---
   const handleAutoGenerate = () => {
-    let bestMenu = null;
-    let bestMissingCount = 999;
-    
-    for(let attempts = 0; attempts < 100; attempts++) {
-        let usedProteins = [];
-        let tempMenu = { mains: [], sides: [], veg: null };
-        let isValid = true;
+    let finalMenu = null;
+    let finalMissingCount = 999;
+    let usedPoolIndex = -1;
 
-        if (diningSize === "one") {
-            const onePersonOptions = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
-            if (onePersonOptions.length > 0) tempMenu.mains.push(getRandomDish(onePersonOptions));
-            else isValid = false;
-        } else {
-            const mains = dishes.filter(d => d.category.includes("main"));
-            const sides = dishes.filter(d => d.category.includes("side"));
-            const vegs = dishes.filter(d => d.category.includes("veg"));
+    // Define priority pools based on the "New" filter and Memory
+    let candidatePools = [];
+    if (filterNewOnly) {
+        candidatePools.push(dishes.filter(d => isNewDish(d) && !seenAutoDishes.includes(d.id))); // Priority 1: Unseen New
+        candidatePools.push(dishes.filter(d => !seenAutoDishes.includes(d.id))); // Priority 2: Unseen Old (Fallback)
+    } else {
+        candidatePools.push(dishes.filter(d => !seenAutoDishes.includes(d.id))); // Priority 1: Unseen Any
+    }
+    candidatePools.push(dishes); // Priority Ultimate: Reset memory and use anything
 
-            const numMains = diningSize === "xlarge" ? 2 : 1;
-            const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
+    const tryGenerateFromPool = (pool) => {
+        let bestMenu = null;
+        let bestMissingCount = 999;
+        
+        for(let attempts = 0; attempts < 100; attempts++) {
+            let usedProteins = [];
+            let tempMenu = { mains: [], sides: [], veg: null };
+            let isValid = true;
 
-            for (let i = 0; i < numMains; i++) {
-                const availableMains = mains.filter(m => !usedProteins.includes(m.protein) && !tempMenu.mains.includes(m));
-                if (availableMains.length > 0) {
-                    const picked = getRandomDish(availableMains);
-                    tempMenu.mains.push(picked);
-                    if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
-                } else isValid = false;
+            if (diningSize === "one") {
+                const onePersonOptions = pool.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
+                if (onePersonOptions.length > 0) tempMenu.mains.push(getRandomDish(onePersonOptions));
+                else isValid = false;
+            } else {
+                const mains = pool.filter(d => d.category.includes("main"));
+                const sides = pool.filter(d => d.category.includes("side"));
+                const vegs = pool.filter(d => d.category.includes("veg"));
+
+                const numMains = diningSize === "xlarge" ? 2 : 1;
+                const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
+
+                for (let i = 0; i < numMains; i++) {
+                    const availableMains = mains.filter(m => !usedProteins.includes(m.protein) && !tempMenu.mains.includes(m));
+                    if (availableMains.length > 0) {
+                        const picked = getRandomDish(availableMains);
+                        tempMenu.mains.push(picked);
+                        if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
+                    } else isValid = false;
+                }
+
+                for (let i = 0; i < numSides; i++) {
+                    const availableSides = sides.filter(s => !usedProteins.includes(s.protein) && !tempMenu.sides.includes(s));
+                    if (availableSides.length > 0) {
+                        const picked = getRandomDish(availableSides);
+                        tempMenu.sides.push(picked);
+                        if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
+                    } else isValid = false;
+                }
+
+                const availableVegs = vegs.filter(v => !usedProteins.includes(v.protein));
+                if (availableVegs.length > 0) tempMenu.veg = getRandomDish(availableVegs);
+                else isValid = false;
             }
 
-            for (let i = 0; i < numSides; i++) {
-                const availableSides = sides.filter(s => !usedProteins.includes(s.protein) && !tempMenu.sides.includes(s));
-                if (availableSides.length > 0) {
-                    const picked = getRandomDish(availableSides);
-                    tempMenu.sides.push(picked);
-                    if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
-                } else isValid = false;
-            }
+            if (!isValid) continue;
 
-            const availableVegs = vegs.filter(v => !usedProteins.includes(v.protein));
-            if (availableVegs.length > 0) tempMenu.veg = getRandomDish(availableVegs);
-            else isValid = false;
+            const missingCount = getMissingIngredients(tempMenu).length;
+            if (missingCount < bestMissingCount) { bestMissingCount = missingCount; bestMenu = tempMenu; }
+            if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
         }
+        return { menu: bestMenu, missing: bestMissingCount };
+    };
 
-        if (!isValid) continue;
-
-        const missingCount = getMissingIngredients(tempMenu).length;
-        if (missingCount < bestMissingCount) { bestMissingCount = missingCount; bestMenu = tempMenu; }
-        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
+    // Cycle through pools until we find a match
+    for (let i = 0; i < candidatePools.length; i++) {
+        if (candidatePools[i].length === 0) continue;
+        
+        const { menu, missing } = tryGenerateFromPool(candidatePools[i]);
+        if (menu && missing < finalMissingCount) {
+            finalMenu = menu;
+            finalMissingCount = missing;
+            usedPoolIndex = i;
+        }
+        if (finalMenu && (shoppingMode === "any" || (shoppingMode === "minimal" && finalMissingCount <= 3) || (shoppingMode === "none" && finalMissingCount === 0))) {
+            break;
+        }
     }
 
-    if (bestMenu) {
-      if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
-        setAutoWarning(`We couldn't find a perfect match for your pantry. Here is the closest option! (Missing ${bestMissingCount} items)`);
+    if (finalMenu) {
+      const generatedDishIds = [];
+      if (finalMenu.mains) finalMenu.mains.forEach(m => generatedDishIds.push(m.id));
+      if (finalMenu.sides) finalMenu.sides.forEach(s => generatedDishIds.push(s.id));
+      if (finalMenu.veg) generatedDishIds.push(finalMenu.veg.id);
+
+      if (usedPoolIndex === candidatePools.length - 1) {
+          // If we had to fall back to the ultimate pool, reset memory to just this menu
+          setSeenAutoDishes(generatedDishIds);
+      } else {
+          // Otherwise, append to our recent memory
+          setSeenAutoDishes([...seenAutoDishes, ...generatedDishIds]);
+      }
+
+      if (shoppingMode !== "any" && finalMissingCount > (shoppingMode === "none" ? 0 : 3)) {
+        setAutoWarning(`We couldn't find a perfect match for your pantry. Here is the closest option! (Missing ${finalMissingCount} items)`);
       } else {
         setAutoWarning("");
       }
-      setGeneratedMenu(bestMenu);
+      setGeneratedMenu(finalMenu);
+      
+      // Auto Scroll
+      setTimeout(() => { if (menuRef.current) menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
     } else {
-      alert("We couldn't generate a valid menu. Try changing your dining size or adding more dishes to your database!");
+      alert("We couldn't generate a valid menu. Try adding more dishes to your database!");
     }
   };
 
-  // Now supports BOTH generatedMenu and manualMenu swapping
   const handleSwapDish = (type, index, isManual = false) => {
     const currentMenu = isManual 
         ? { ...manualMenu, mains: [...manualMenu.mains], sides: [...manualMenu.sides] } 
@@ -332,36 +371,58 @@ export default function DinnerApp() {
     ].filter(d => d);
 
     const usedProteins = otherDishes.map(d => d.protein).filter(p => p !== "none" && p !== "seafood");
-
     const targetCategory = type === 'mains' ? 'main' : type === 'sides' ? 'side' : 'veg';
-    let pool = dishes.filter(d => d.category.includes(targetCategory));
-    if (diningSize === "one") pool = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
+    
+    let basePool = dishes.filter(d => d.category.includes(targetCategory));
+    if (diningSize === "one") basePool = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
+
+    let candidatePools = [];
+    if (!isManual && filterNewOnly) {
+        candidatePools.push(basePool.filter(d => isNewDish(d) && !seenAutoDishes.includes(d.id)));
+        candidatePools.push(basePool.filter(d => !seenAutoDishes.includes(d.id)));
+    } else if (!isManual) {
+        candidatePools.push(basePool.filter(d => !seenAutoDishes.includes(d.id)));
+    }
+    candidatePools.push(basePool); 
 
     let bestCandidate = null;
     let bestMissingCount = 999;
+    let usedPoolIndex = -1;
     
-    const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
-
-    for (let d of shuffledPool) {
-       if (d.id === oldDish.id) continue; 
-       if (usedProteins.includes(d.protein)) continue; 
-       
-       const testMenu = { ...currentMenu };
-       if (type === 'veg') testMenu.veg = d;
-       else testMenu[type][index] = d;
-       
-       const missingCount = getMissingIngredients(testMenu).length;
-       if (missingCount < bestMissingCount) {
-           bestMissingCount = missingCount;
-           bestCandidate = d;
-       }
-       
-       if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
+    for (let i = 0; i < candidatePools.length; i++) {
+        const shuffledPool = [...candidatePools[i]].sort(() => 0.5 - Math.random());
+        for (let d of shuffledPool) {
+           if (d.id === oldDish.id) continue; 
+           if (usedProteins.includes(d.protein)) continue; 
+           
+           const testMenu = { ...currentMenu };
+           if (type === 'veg') testMenu.veg = d;
+           else testMenu[type][index] = d;
+           
+           const missingCount = getMissingIngredients(testMenu).length;
+           if (missingCount < bestMissingCount) {
+               bestMissingCount = missingCount;
+               bestCandidate = d;
+               usedPoolIndex = i;
+           }
+           if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
+        }
+        if (bestCandidate && (shoppingMode === "any" || (shoppingMode === "minimal" && bestMissingCount <= 3) || (shoppingMode === "none" && bestMissingCount === 0))) {
+            break;
+        }
     }
 
     if (!bestCandidate) {
        alert("Couldn't find any alternative dishes that fit your current constraints!");
        return;
+    }
+
+    if (!isManual) {
+       if (usedPoolIndex === candidatePools.length - 1) {
+           setSeenAutoDishes([bestCandidate.id]);
+       } else {
+           setSeenAutoDishes([...seenAutoDishes, bestCandidate.id]);
+       }
     }
 
     if (type === 'veg') currentMenu.veg = bestCandidate;
@@ -380,7 +441,6 @@ export default function DinnerApp() {
     }
   };
 
-  // --- NEW: JUMP TO MANUAL MODE ---
   const handleManualPick = (type) => {
     setManualMenu({
       mains: [...generatedMenu.mains],
@@ -442,7 +502,10 @@ export default function DinnerApp() {
   const toggleManualSelection = (type, dish, maxLimit) => {
     if (type === 'veg') { 
       setManualMenu({...manualMenu, veg: manualMenu.veg?.id === dish.id ? null : dish}); 
-      if (manualMenu.veg?.id !== dish.id) setManualSearch(""); 
+      if (manualMenu.veg?.id !== dish.id) {
+        setManualSearch(""); 
+        setTimeout(() => { if (shareRef.current) shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+      }
       return; 
     }
     
@@ -454,6 +517,15 @@ export default function DinnerApp() {
       if (current.length >= maxLimit) current.shift(); 
       current.push(dish); 
       setManualSearch(""); 
+      
+      // Auto-scroll to next section
+      if (current.length === maxLimit) {
+        setTimeout(() => {
+          if (type === 'mains' && sideRef.current) sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          else if (type === 'mains' && !sideRef.current && vegRef.current) vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          else if (type === 'sides' && vegRef.current) vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+      }
     }
     setManualMenu({...manualMenu, [type]: current});
   };
@@ -480,22 +552,13 @@ export default function DinnerApp() {
   
   const filterBySearch = (options) => {
     let filtered = options;
-    
     if (filterNewOnly) {
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-      const now = Date.now();
-      filtered = filtered.filter(d => {
-        if (!d.id.startsWith("c_")) return false;
-        const timestamp = parseInt(d.id.split("_")[1]);
-        return !isNaN(timestamp) && (now - timestamp <= thirtyDaysMs);
-      });
+      filtered = filtered.filter(d => isNewDish(d));
     }
-
     if (manualSearch.trim()) {
       const lowerSearch = manualSearch.toLowerCase();
       filtered = filtered.filter(d => d.name.toLowerCase().includes(lowerSearch));
     }
-    
     return filtered;
   };
 
@@ -621,7 +684,6 @@ export default function DinnerApp() {
     </>
   );
 
-  // --- NEW: UNIVERSAL SUMMARY RENDERER ---
   const renderMenuSummary = (menuToRender, isManual) => (
     <>
       {autoWarning && (
@@ -704,7 +766,6 @@ export default function DinnerApp() {
     </>
   );
 
-  // --- NEW: AUTO-COLLAPSE COMPONENT SECTION ---
   const renderManualSectionBlock = (type, title, numRequired, optionsArray, selectedArray, containerRef) => {
     const isComplete = type === 'veg' ? selectedArray[0] !== null : selectedArray.length === numRequired;
     return (
@@ -898,14 +959,23 @@ export default function DinnerApp() {
                 </button>
               </div>
             </div>
+            
+            <div style={{ marginTop: "20px", display: "flex", justifyContent: "center" }}>
+              <button 
+                onClick={() => setFilterNewOnly(!filterNewOnly)}
+                style={{ ...styles.tag(filterNewOnly), margin: 0, padding: "8px 16px" }}
+              >
+                New Dishes Only
+              </button>
+            </div>
           </div>
 
           <div style={{...styles.nav, borderBottom: "2px solid #eee", paddingBottom: "15px"}}>
-            <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>💡 Surprise me</button>
+            <button style={{...styles.tag(mode === "auto"), flex: 1, textAlign: "center"}} onClick={() => setMode("auto")}>Surprise me!</button>
             <button style={{...styles.tag(mode === "manual"), flex: 1, textAlign: "center"}} onClick={() => {
               setMode("manual");
               setTimeout(() => { if (searchRef.current) searchRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
-            }}>💭 Let me think</button>
+            }}>Let me think...</button>
           </div>
 
           {mode === "auto" && (
@@ -921,33 +991,25 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
-              <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
-                <div ref={searchRef} style={{ position: "relative", flex: 1 }}>
-                  <input 
-                    style={{...styles.input, marginBottom: 0, paddingRight: "40px"}} 
-                    placeholder="🔍 Search dishes..." 
-                    value={manualSearch} 
-                    onChange={e => setManualSearch(e.target.value)} 
-                  />
-                  {manualSearch && (
-                    <button 
-                      onClick={() => setManualSearch("")}
-                      style={{
-                        position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)",
-                        background: "none", border: "none", fontSize: "28px", color: "#aaa", cursor: "pointer", padding: 0,
-                        lineHeight: "1"
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-                <button 
-                  onClick={() => setFilterNewOnly(!filterNewOnly)}
-                  style={{ ...styles.tag(filterNewOnly), margin: 0, padding: "12px 14px", display: "flex", alignItems: "center", gap: "6px" }}
-                >
-                  New
-                </button>
+              <div ref={searchRef} style={{ position: "relative", marginBottom: '20px' }}>
+                <input 
+                  style={{...styles.input, marginBottom: 0, paddingRight: "40px"}} 
+                  placeholder="🔍 Search dishes..." 
+                  value={manualSearch} 
+                  onChange={e => setManualSearch(e.target.value)} 
+                />
+                {manualSearch && (
+                  <button 
+                    onClick={() => setManualSearch("")}
+                    style={{
+                      position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)",
+                      background: "none", border: "none", fontSize: "28px", color: "#aaa", cursor: "pointer", padding: 0,
+                      lineHeight: "1"
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
               </div>
               
               {diningSize === "one" ? (
