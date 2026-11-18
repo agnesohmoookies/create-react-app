@@ -80,7 +80,7 @@ export default function DinnerApp() {
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
   const [autoWarning, setAutoWarning] = useState(""); 
   
-  // NEW: Short-term memory for auto generation
+  // Short-term memory for auto generation
   const [seenAutoDishes, setSeenAutoDishes] = useState([]);
 
   const hasFetched = useRef(false);
@@ -93,18 +93,14 @@ export default function DinnerApp() {
 
   const masterIngredients = useMemo(() => Object.keys(inventory).sort(), [inventory]);
 
-  // SMART "NEW" DETECTION: Looks for App-Added OR Sheet-Pasted dishes!
   const isNewDish = (d) => {
-    // 1. Check if added via App in last 30 days
     if (String(d.id).startsWith("c_")) {
       const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
       const timestamp = parseInt(String(d.id).split("_")[1]);
       if (!isNaN(timestamp) && (Date.now() - timestamp <= thirtyDaysMs)) return true;
     }
-    // 2. Check if manually added to Google Sheet (last 15 items in the database)
     const idx = dishes.findIndex(x => x.id === d.id);
     if (idx >= 0 && idx >= dishes.length - 15) return true;
-    
     return false;
   };
 
@@ -238,7 +234,6 @@ export default function DinnerApp() {
     setNewDish({ name: "", category: ["main"], protein: "", ingredients: [], remarks: "", onePerson: false });
   };
 
-  // AUTO SCROLL LOGIC
   useEffect(() => {
     if (mode === "auto" && generatedMenu && menuRef.current) setTimeout(() => menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, [generatedMenu, mode]);
@@ -257,9 +252,6 @@ export default function DinnerApp() {
     }
   }, [manualMenu, mode, diningSize]);
 
-  // MENU GENERATION LOGIC
-  const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
-
   const getMissingIngredients = (menu) => {
     let required = [];
     if (menu.mains) menu.mains.forEach(m => { if(m) required.push(...m.ingredients); });
@@ -267,17 +259,16 @@ export default function DinnerApp() {
     if (menu.veg) required.push(...menu.veg.ingredients);
     
     const uniqueRequired = [...new Set(required)];
+    const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
     const availableLower = availableIngredientsList.map(i => i.trim().toLowerCase());
     
     return uniqueRequired.filter(ing => !availableLower.includes(ing.trim().toLowerCase()));
   };
 
-  // --- NEW: SCORING ENGINE ---
   const handleAutoGenerate = () => {
     let bestMenu = null;
     let bestMissingCount = 999;
     
-    // Core Engine: Scores dishes so New+Unseen is grabbed first, seamlessly falling back to Old+Seen if needed
     const pickDish = (pool, usedProteins, currentMenuDishes) => {
         const available = pool.filter(d => !usedProteins.includes(d.protein) && !currentMenuDishes.some(cmd => cmd && cmd.id === d.id));
         if (available.length === 0) return null;
@@ -285,10 +276,10 @@ export default function DinnerApp() {
         const scoreDish = (d) => {
             const isNew = isNewDish(d);
             const isSeen = seenAutoDishes.includes(d.id);
-            if (filterNewOnly && isNew && !isSeen) return 4; // Ultimate Priority
-            if (!isSeen) return 3;                           // Unseen Old Dish
-            if (filterNewOnly && isNew && isSeen) return 2;  // Seen New Dish
-            return 1;                                        // Seen Old Dish (Desperate)
+            if (filterNewOnly && isNew && !isSeen) return 4; 
+            if (!isSeen) return 3;                           
+            if (filterNewOnly && isNew && isSeen) return 2;  
+            return 1;                                        
         };
         
         const maxScore = Math.max(...available.map(scoreDish));
@@ -343,7 +334,6 @@ export default function DinnerApp() {
     }
 
     if (bestMenu) {
-      // Memory Management: Flush if we've seen almost everything to keep it fresh
       const generatedDishIds = [];
       if (bestMenu.mains) bestMenu.mains.forEach(m => generatedDishIds.push(m.id));
       if (bestMenu.sides) bestMenu.sides.forEach(s => generatedDishIds.push(s.id));
@@ -377,12 +367,11 @@ export default function DinnerApp() {
     ].filter(d => d);
 
     const usedProteins = otherDishes.map(d => d.protein).filter(p => p !== "none" && p !== "seafood");
-
     const targetCategory = type === 'mains' ? 'main' : type === 'sides' ? 'side' : 'veg';
+    
     let basePool = dishes.filter(d => d.category.includes(targetCategory));
     if (diningSize === "one") basePool = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
 
-    // Scoring engine for manual swapping
     const scoreDish = (d) => {
         const isNew = isNewDish(d);
         const isSeen = seenAutoDishes.includes(d.id);
@@ -392,7 +381,6 @@ export default function DinnerApp() {
         return 1;
     };
 
-    // Sort by highest score first, randomizing ties
     const shuffledPool = [...basePool].sort((a, b) => {
         const scoreDiff = scoreDish(b) - scoreDish(a);
         return scoreDiff !== 0 ? scoreDiff : Math.random() - 0.5;
@@ -781,7 +769,7 @@ export default function DinnerApp() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
             {selectedArray.filter(Boolean).map(m => (
               <button key={m.id} style={{...styles.tag(true), padding: "12px 20px"}} onClick={() => toggleManualSelection(type, m, numRequired)}>
-                ✓ {formatNameUI(m.name)} <span style={{fontSize: "12px", marginLeft: "8px", opacity: 0.8}}>(Tap to change)</span>
+                ✓ {formatNameUI(m.name)}
               </button>
             ))}
           </div>
@@ -962,13 +950,12 @@ export default function DinnerApp() {
               </div>
             </div>
             
-            <div style={{ marginTop: "20px", display: "flex", justifyContent: "center" }}>
-              <button 
-                onClick={() => setFilterNewOnly(!filterNewOnly)}
-                style={{ ...styles.tag(filterNewOnly), margin: 0, padding: "8px 16px" }}
-              >
-                Feel like something new today
-              </button>
+            {/* NEW: Native Toggle Switch UI */}
+            <div style={{ marginTop: "25px", paddingTop: "20px", borderTop: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setFilterNewOnly(!filterNewOnly)}>
+              <span style={{ fontSize: "15px", fontWeight: "bold", color: "#555" }}>Feel like something new today</span>
+              <div style={{ width: '44px', height: '24px', background: filterNewOnly ? '#FF8CA1' : '#ddd', borderRadius: '12px', position: 'relative', transition: '0.3s' }}>
+                <div style={{ width: '20px', height: '20px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', left: filterNewOnly ? '22px' : '2px', transition: '0.3s', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }} />
+              </div>
             </div>
           </div>
 
