@@ -39,7 +39,14 @@ export default function DinnerApp() {
   
   const [dishes, setDishes] = useState(() => {
     const local = localStorage.getItem("v3_dishes");
-    return local ? JSON.parse(local) : [];
+    if (local) {
+      const parsed = JSON.parse(local);
+      return parsed.map(d => ({
+        ...d,
+        category: Array.isArray(d.category) ? d.category : String(d.category || "main").split(",").map(c => c.trim())
+      }));
+    }
+    return [];
   });
   
   const [inventory, setInventory] = useState(() => {
@@ -52,10 +59,11 @@ export default function DinnerApp() {
     return local ? JSON.parse(local) : {};
   });
 
-  const [newDish, setNewDish] = useState({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
+  const [newDish, setNewDish] = useState({ name: "", category: ["main"], protein: "", ingredients: [], remarks: "", onePerson: false });
   const [ingredientInput, setIngredientInput] = useState("");
   const [inventorySearch, setInventorySearch] = useState("");
   const [manualSearch, setManualSearch] = useState("");
+  const [filterNewOnly, setFilterNewOnly] = useState(false); 
   const [isSyncing, setIsSyncing] = useState(false);
   const [extraShoppingItems, setExtraShoppingItems] = useState([]);
   const [extraShoppingInput, setExtraShoppingInput] = useState("");
@@ -86,7 +94,9 @@ export default function DinnerApp() {
         
         if (cloudData.dishes && cloudData.dishes.length > 0) {
           const parsedDishes = cloudData.dishes.map(d => ({
-            id: d["ID"], name: d["Name"], category: String(d["Category"] || "main").trim().toLowerCase(), 
+            id: d["ID"], 
+            name: d["Name"], 
+            category: String(d["Category"] || "main").toLowerCase().split(",").map(c => c.trim()), 
             protein: String(d["Protein"] || "none").trim().toLowerCase(),
             ingredients: typeof d["Ingredients"] === "string" ? d["Ingredients"].split(",").map(i => i.trim().toLowerCase()).filter(i=>i) : [],
             remarks: d["Remarks"] || "",
@@ -137,10 +147,16 @@ export default function DinnerApp() {
 
   const handleAddDish = () => {
     if (!newDish.name || newDish.ingredients.length === 0) return alert("Please fill in name and at least one ingredient!");
+    if (newDish.category.length === 0) return alert("Please select at least one category!");
     
     const dishToSave = {
-      id: "c_" + Date.now(), name: newDish.name, category: newDish.category, protein: newDish.protein || "none", 
-      ingredients: newDish.ingredients, remarks: newDish.remarks.trim(), onePerson: newDish.onePerson
+      id: "c_" + Date.now(), 
+      name: newDish.name, 
+      category: newDish.category, 
+      protein: newDish.protein || "none", 
+      ingredients: newDish.ingredients, 
+      remarks: newDish.remarks.trim(), 
+      onePerson: newDish.onePerson
     };
     
     const updatedDishes = [...dishes, dishToSave];
@@ -177,9 +193,13 @@ export default function DinnerApp() {
     }
 
     const payloadDish = {
-      id: dishToSave.id, name: dishToSave.name, category: dishToSave.category,
-      protein: dishToSave.protein, ingredients: dishToSave.ingredients.join(", "),
-      remarks: dishToSave.remarks, onePerson: dishToSave.onePerson ? "TRUE" : "FALSE"
+      id: dishToSave.id, 
+      name: dishToSave.name, 
+      category: dishToSave.category.join(", "), 
+      protein: dishToSave.protein, 
+      ingredients: dishToSave.ingredients.join(", "),
+      remarks: dishToSave.remarks, 
+      onePerson: dishToSave.onePerson ? "TRUE" : "FALSE"
     };
     
     fetch(SCRIPT_URL, {
@@ -188,7 +208,7 @@ export default function DinnerApp() {
     });
     
     alert("Dish added successfully!");
-    setNewDish({ name: "", category: "main", protein: "", ingredients: [], remarks: "", onePerson: false });
+    setNewDish({ name: "", category: ["main"], protein: "", ingredients: [], remarks: "", onePerson: false });
   };
 
   // AUTO SCROLL LOGIC
@@ -235,13 +255,13 @@ export default function DinnerApp() {
         let isValid = true;
 
         if (diningSize === "one") {
-            const onePersonOptions = dishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+            const onePersonOptions = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
             if (onePersonOptions.length > 0) tempMenu.mains.push(getRandomDish(onePersonOptions));
             else isValid = false;
         } else {
-            const mains = dishes.filter(d => d.category === "main");
-            const sides = dishes.filter(d => d.category === "side");
-            const vegs = dishes.filter(d => d.category === "veg");
+            const mains = dishes.filter(d => d.category.includes("main"));
+            const sides = dishes.filter(d => d.category.includes("side"));
+            const vegs = dishes.filter(d => d.category.includes("veg"));
 
             const numMains = diningSize === "xlarge" ? 2 : 1;
             const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
@@ -288,12 +308,10 @@ export default function DinnerApp() {
     }
   };
 
-  // --- NEW: INDIVIDUAL DISH SWAPPING ---
   const handleSwapDish = (type, index) => {
     const currentMenu = { ...generatedMenu, mains: [...generatedMenu.mains], sides: [...generatedMenu.sides] };
     const oldDish = type === 'veg' ? currentMenu.veg : currentMenu[type][index];
     
-    // Find what proteins the OTHER current dishes are using
     const otherDishes = [
        ...(type === 'mains' ? currentMenu.mains.filter((_, i) => i !== index) : currentMenu.mains),
        ...(type === 'sides' ? currentMenu.sides.filter((_, i) => i !== index) : currentMenu.sides),
@@ -302,19 +320,18 @@ export default function DinnerApp() {
 
     const usedProteins = otherDishes.map(d => d.protein).filter(p => p !== "none" && p !== "seafood");
 
-    // Get valid candidates
-    let pool = dishes.filter(d => d.category === (type === 'mains' ? 'main' : type === 'sides' ? 'side' : 'veg'));
-    if (diningSize === "one") pool = dishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+    const targetCategory = type === 'mains' ? 'main' : type === 'sides' ? 'side' : 'veg';
+    let pool = dishes.filter(d => d.category.includes(targetCategory));
+    if (diningSize === "one") pool = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
 
     let bestCandidate = null;
     let bestMissingCount = 999;
     
-    // Shuffle pool to ensure random swap
     const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
 
     for (let d of shuffledPool) {
-       if (d.id === oldDish.id) continue; // Don't pick the same dish
-       if (usedProteins.includes(d.protein)) continue; // Don't duplicate proteins
+       if (d.id === oldDish.id) continue; 
+       if (usedProteins.includes(d.protein)) continue; 
        
        const testMenu = { ...currentMenu };
        if (type === 'veg') testMenu.veg = d;
@@ -326,7 +343,6 @@ export default function DinnerApp() {
            bestCandidate = d;
        }
        
-       // If we found a perfect match based on shopping rules, stop searching immediately
        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
     }
 
@@ -347,6 +363,24 @@ export default function DinnerApp() {
     }
   };
 
+  // --- NEW: JUMP TO MANUAL MODE ---
+  const handleManualPick = (type) => {
+    // 1. Copy generated menu exactly as-is into manual mode
+    setManualMenu({
+      mains: [...generatedMenu.mains],
+      sides: [...generatedMenu.sides],
+      veg: generatedMenu.veg
+    });
+    // 2. Switch to manual mode
+    setMode("manual");
+    // 3. Glide directly to the section they need to pick
+    setTimeout(() => {
+      if (type === 'mains' && mainRef.current) mainRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else if (type === 'sides' && sideRef.current) sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else if (type === 'veg' && vegRef.current) vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   const getManualOptions = (type) => {
     let usedOther = []; let usedSelf = [];
 
@@ -361,8 +395,8 @@ export default function DinnerApp() {
       manualMenu.sides.forEach(s => { if(s && s.protein !== "none" && s.protein !== "seafood") usedOther.push(s.protein); });
     }
 
-    let pool = dishes.filter(d => d.category === type);
-    if (diningSize === "one") pool = dishes.filter(d => d.onePerson && (d.category === "main" || d.category === "side"));
+    let pool = dishes.filter(d => d.category.includes(type));
+    if (diningSize === "one") pool = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
 
     return pool.filter(d => {
        if (usedOther.includes(d.protein)) return false;
@@ -394,7 +428,7 @@ export default function DinnerApp() {
   const toggleManualSelection = (type, dish, maxLimit) => {
     if (type === 'veg') { 
       setManualMenu({...manualMenu, veg: manualMenu.veg?.id === dish.id ? null : dish}); 
-      if (manualMenu.veg?.id !== dish.id) setManualSearch(""); // INSTANT CLEAR ON SELECT
+      if (manualMenu.veg?.id !== dish.id) setManualSearch(""); 
       return; 
     }
     
@@ -405,7 +439,7 @@ export default function DinnerApp() {
     } else { 
       if (current.length >= maxLimit) current.shift(); 
       current.push(dish); 
-      setManualSearch(""); // INSTANT CLEAR ON SELECT
+      setManualSearch(""); 
     }
     setManualMenu({...manualMenu, [type]: current});
   };
@@ -431,9 +465,24 @@ export default function DinnerApp() {
   const numSides = diningSize === "one" ? 0 : diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
   
   const filterBySearch = (options) => {
-    if (!manualSearch.trim()) return options;
-    const lowerSearch = manualSearch.toLowerCase();
-    return options.filter(d => d.name.toLowerCase().includes(lowerSearch));
+    let filtered = options;
+    
+    if (filterNewOnly) {
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      filtered = filtered.filter(d => {
+        if (!d.id.startsWith("c_")) return false;
+        const timestamp = parseInt(d.id.split("_")[1]);
+        return !isNaN(timestamp) && (now - timestamp <= thirtyDaysMs);
+      });
+    }
+
+    if (manualSearch.trim()) {
+      const lowerSearch = manualSearch.toLowerCase();
+      filtered = filtered.filter(d => d.name.toLowerCase().includes(lowerSearch));
+    }
+    
+    return filtered;
   };
 
   const manualOptionsAny = mode === "manual" && diningSize === "one" ? filterBySearch(getManualOptions('any')) : [];
@@ -460,10 +509,7 @@ export default function DinnerApp() {
     block: { marginBottom: "20px", padding: "20px", background: "#f9f9f9", borderRadius: "16px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", position: "relative" },
     btn: { background: "#FF8CA1", color: "white", padding: "16px", border: "none", borderRadius: "14px", width: "100%", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "10px", boxShadow: "0 4px 12px rgba(255, 140, 161, 0.3)" },
     categoryHeader: { fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px", color: "#888", marginTop: "15px", marginBottom: "8px" },
-    
-    // NEW: Interactive hover style for swapping dishes
     menuCard: { display: "flex", alignItems: "center", gap: "15px", padding: "12px 10px", borderBottom: "1px solid #eee", cursor: "pointer", borderRadius: "10px", transition: "0.2s" },
-    
     input: { width: "100%", padding: "14px 20px", borderRadius: "20px", border: "1px solid #ddd", marginBottom: "15px", boxSizing: "border-box", fontSize: "16px" },
     syncingIndicator: { textAlign: "center", color: "#FF8CA1", fontSize: "12px", fontWeight: "bold", marginBottom: "10px", height: "15px" }
   };
@@ -563,7 +609,7 @@ export default function DinnerApp() {
 
   return (
     <div style={styles.container}>
-      <h2 style={{ textAlign: "center", color: "#FF8CA1", margin: "10px 0 5px 0" }}>🍽️ Dinner Planner</h2>
+      <h2 style={{ textAlign: "center", color: "#FF8CA1", margin: "10px 0 5px 0" }}>Dinner Planner</h2>
       
       <div style={styles.syncingIndicator}>
         {isSyncing ? "Teleporting to your kitchen... 🪄🍳" : ""}
@@ -580,12 +626,31 @@ export default function DinnerApp() {
           <h3 style={{ marginTop: 0 }}>Add a New Dish</h3>
           <label style={{fontWeight: "bold", fontSize: "14px"}}>Dish Name</label>
           <input style={styles.input} placeholder="Name a dish..." value={newDish.name} onChange={e => setNewDish({...newDish, name: e.target.value})} />
-          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Category</label>
+          
+          <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Categories (Multi-Select)</label>
           <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
-            {["main", "side", "veg"].map(cat => (
-              <button key={cat} style={styles.tag(newDish.category === cat)} onClick={() => setNewDish({...newDish, category: cat})}>{cat.toUpperCase()}</button>
-            ))}
+            {["main", "side", "veg"].map(cat => {
+              const isSelected = newDish.category.includes(cat);
+              return (
+                <button 
+                  key={cat} 
+                  style={styles.tag(isSelected)} 
+                  onClick={() => {
+                    let updatedCats = [...newDish.category];
+                    if (isSelected) {
+                      updatedCats = updatedCats.filter(c => c !== cat);
+                    } else {
+                      updatedCats.push(cat);
+                    }
+                    setNewDish({...newDish, category: updatedCats});
+                  }}
+                >
+                  {cat.toUpperCase()}
+                </button>
+              )
+            })}
           </div>
+
           <label style={{fontWeight: "bold", fontSize: "14px", display: "block", marginBottom: "8px"}}>Main Protein (Optional)</label>
           <div style={{ display: "flex", gap: "5px", marginBottom: "15px", flexWrap: "wrap" }}>
             {["pork", "beef", "chicken", "seafood", "soy"].map(pro => (
@@ -728,29 +793,54 @@ export default function DinnerApp() {
                       {autoWarning}
                     </div>
                   )}
-                  <h3 style={{ marginTop: 0 }}>Tonight's Menu (Tap a dish to swap it!):</h3>
+                  
+                  <h3 style={{ marginTop: 0, fontSize: "18px", color: "#333", lineHeight: "1.4" }}>
+                    Tonight's Menu<br/>
+                    <span style={{fontSize: "13px", fontWeight: "normal", color: "#777"}}></span>
+                  </h3>
                   
                   {generatedMenu.mains.map((m, i) => (
-                    <div style={styles.menuCard} key={`auto-m-${i}`} onClick={() => handleSwapDish('mains', i)}>
-                      <DishIcon type="main" />
-                      <div style={{ flex: 1, fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
-                      <div style={{ fontSize: "20px", color: "#FF8CA1" }}>🔄</div>
+                    <div style={styles.menuCard} key={`auto-m-${i}`}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => handleManualPick('mains')}>
+                        <DishIcon type="main" />
+                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleSwapDish('mains', i); }} 
+                        style={{ background: "none", border: "none", fontSize: "24px", padding: "10px", cursor: "pointer" }}
+                      >
+                        🔄
+                      </button>
                     </div>
                   ))}
                   
                   {generatedMenu.sides.map((s, i) => (
-                    <div style={styles.menuCard} key={`auto-s-${i}`} onClick={() => handleSwapDish('sides', i)}>
-                      <DishIcon type="side" />
-                      <div style={{ flex: 1, fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
-                      <div style={{ fontSize: "20px", color: "#FF8CA1" }}>🔄</div>
+                    <div style={styles.menuCard} key={`auto-s-${i}`}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => handleManualPick('sides')}>
+                        <DishIcon type="side" />
+                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleSwapDish('sides', i); }} 
+                        style={{ background: "none", border: "none", fontSize: "24px", padding: "10px", cursor: "pointer" }}
+                      >
+                        🔄
+                      </button>
                     </div>
                   ))}
                   
                   {generatedMenu.veg && (
-                    <div style={{...styles.menuCard, borderBottom: "none"}} onClick={() => handleSwapDish('veg', 0)}>
-                      <DishIcon type="veg" />
-                      <div style={{ flex: 1, fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
-                      <div style={{ fontSize: "20px", color: "#FF8CA1" }}>🔄</div>
+                    <div style={{...styles.menuCard, borderBottom: "none"}}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => handleManualPick('veg')}>
+                        <DishIcon type="veg" />
+                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleSwapDish('veg', 0); }} 
+                        style={{ background: "none", border: "none", fontSize: "24px", padding: "10px", cursor: "pointer" }}
+                      >
+                        🔄
+                      </button>
                     </div>
                   )}
                   
@@ -762,25 +852,33 @@ export default function DinnerApp() {
 
           {mode === "manual" && (
             <div>
-              <div ref={searchRef} style={{ position: "relative", marginBottom: '20px' }}>
-                <input 
-                  style={{...styles.input, marginBottom: 0, paddingRight: "40px"}} 
-                  placeholder="🔍 Search dishes..." 
-                  value={manualSearch} 
-                  onChange={e => setManualSearch(e.target.value)} 
-                />
-                {manualSearch && (
-                  <button 
-                    onClick={() => setManualSearch("")}
-                    style={{
-                      position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)",
-                      background: "none", border: "none", fontSize: "28px", color: "#aaa", cursor: "pointer", padding: 0,
-                      lineHeight: "1"
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
+              <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
+                <div ref={searchRef} style={{ position: "relative", flex: 1 }}>
+                  <input 
+                    style={{...styles.input, marginBottom: 0, paddingRight: "40px"}} 
+                    placeholder="🔍 Search dishes..." 
+                    value={manualSearch} 
+                    onChange={e => setManualSearch(e.target.value)} 
+                  />
+                  {manualSearch && (
+                    <button 
+                      onClick={() => setManualSearch("")}
+                      style={{
+                        position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)",
+                        background: "none", border: "none", fontSize: "28px", color: "#aaa", cursor: "pointer", padding: 0,
+                        lineHeight: "1"
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                <button 
+                  onClick={() => setFilterNewOnly(!filterNewOnly)}
+                  style={{ ...styles.tag(filterNewOnly), margin: 0, padding: "12px 14px", display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  ✨ New
+                </button>
               </div>
               
               {diningSize === "one" ? (
