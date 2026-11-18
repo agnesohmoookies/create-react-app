@@ -30,6 +30,15 @@ const getIngredientCategory = (item) => {
 
 const CATEGORY_ORDER = ["Pork", "Beef", "Chicken", "Seafood", "Soy", "Leafy Greens", "Mushrooms", "Root Veggies & Gourds", "Other Veggies", "Fruits", "Nuts", "Grains & Wrappers", "Condiments", "Needs Review"];
 
+// --- ICONS ---
+const RefreshIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10"></polyline>
+    <polyline points="1 20 1 14 7 14"></polyline>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+  </svg>
+);
+
 export default function DinnerApp() {
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState("planner"); 
@@ -308,8 +317,12 @@ export default function DinnerApp() {
     }
   };
 
-  const handleSwapDish = (type, index) => {
-    const currentMenu = { ...generatedMenu, mains: [...generatedMenu.mains], sides: [...generatedMenu.sides] };
+  // Now supports BOTH generatedMenu and manualMenu swapping
+  const handleSwapDish = (type, index, isManual = false) => {
+    const currentMenu = isManual 
+        ? { ...manualMenu, mains: [...manualMenu.mains], sides: [...manualMenu.sides] } 
+        : { ...generatedMenu, mains: [...generatedMenu.mains], sides: [...generatedMenu.sides] };
+        
     const oldDish = type === 'veg' ? currentMenu.veg : currentMenu[type][index];
     
     const otherDishes = [
@@ -354,7 +367,11 @@ export default function DinnerApp() {
     if (type === 'veg') currentMenu.veg = bestCandidate;
     else currentMenu[type][index] = bestCandidate;
     
-    setGeneratedMenu(currentMenu);
+    if (isManual) {
+      setManualMenu(currentMenu);
+    } else {
+      setGeneratedMenu(currentMenu);
+    }
     
     if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
        setAutoWarning(`Swapped! (Note: couldn't find a perfect pantry match, missing ${bestMissingCount} items)`);
@@ -365,15 +382,12 @@ export default function DinnerApp() {
 
   // --- NEW: JUMP TO MANUAL MODE ---
   const handleManualPick = (type) => {
-    // 1. Copy generated menu exactly as-is into manual mode
     setManualMenu({
       mains: [...generatedMenu.mains],
       sides: [...generatedMenu.sides],
       veg: generatedMenu.veg
     });
-    // 2. Switch to manual mode
     setMode("manual");
-    // 3. Glide directly to the section they need to pick
     setTimeout(() => {
       if (type === 'mains' && mainRef.current) mainRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       else if (type === 'sides' && sideRef.current) sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -607,6 +621,118 @@ export default function DinnerApp() {
     </>
   );
 
+  // --- NEW: UNIVERSAL SUMMARY RENDERER ---
+  const renderMenuSummary = (menuToRender, isManual) => (
+    <>
+      {autoWarning && (
+        <div style={{ backgroundColor: "#FFE5E5", border: "2px solid #FF4D4D", padding: "15px", marginBottom: "20px", borderRadius: "12px", fontSize: "15px", color: "#990000", textAlign: "center", lineHeight: "1.4" }}>
+          <strong>⚠️ Quick Note:</strong><br/>
+          {autoWarning}
+        </div>
+      )}
+      <h3 style={{ marginTop: 0, fontSize: "18px", color: "#333", lineHeight: "1.4" }}>
+        Tonight's Menu
+      </h3>
+      
+      {menuToRender.mains.map((m, i) => (
+        <div style={styles.menuCard} key={`${isManual ? 'manual' : 'auto'}-m-${i}`}>
+          <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => {
+            if (isManual) {
+              toggleManualSelection('mains', m, numMains);
+              setTimeout(() => { if (mainRef.current) mainRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+            } else {
+              handleManualPick('mains');
+            }
+          }}>
+            <DishIcon type="main" />
+            <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
+          </div>
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleSwapDish('mains', i, isManual); }} 
+            style={{ background: "none", border: "none", padding: "10px", cursor: "pointer", color: "#FF8CA1" }}
+          >
+            <RefreshIcon />
+          </button>
+        </div>
+      ))}
+      
+      {menuToRender.sides.map((s, i) => (
+        <div style={styles.menuCard} key={`${isManual ? 'manual' : 'auto'}-s-${i}`}>
+          <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => {
+            if (isManual) {
+              toggleManualSelection('sides', s, numSides);
+              setTimeout(() => { if (sideRef.current) sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+            } else {
+              handleManualPick('sides');
+            }
+          }}>
+            <DishIcon type="side" />
+            <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
+          </div>
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleSwapDish('sides', i, isManual); }} 
+            style={{ background: "none", border: "none", padding: "10px", cursor: "pointer", color: "#FF8CA1" }}
+          >
+            <RefreshIcon />
+          </button>
+        </div>
+      ))}
+      
+      {menuToRender.veg && (
+        <div style={{...styles.menuCard, borderBottom: "none"}} key={`${isManual ? 'manual' : 'auto'}-v-0`}>
+          <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => {
+            if (isManual) {
+              toggleManualSelection('veg', menuToRender.veg, 1);
+              setTimeout(() => { if (vegRef.current) vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+            } else {
+              handleManualPick('veg');
+            }
+          }}>
+            <DishIcon type="veg" />
+            <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(menuToRender.veg.name)}</div>
+          </div>
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleSwapDish('veg', 0, isManual); }} 
+            style={{ background: "none", border: "none", padding: "10px", cursor: "pointer", color: "#FF8CA1" }}
+          >
+            <RefreshIcon />
+          </button>
+        </div>
+      )}
+      
+      <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #eee" }}>{renderShareSection(menuToRender)}</div>
+    </>
+  );
+
+  // --- NEW: AUTO-COLLAPSE COMPONENT SECTION ---
+  const renderManualSectionBlock = (type, title, numRequired, optionsArray, selectedArray, containerRef) => {
+    const isComplete = type === 'veg' ? selectedArray[0] !== null : selectedArray.length === numRequired;
+    return (
+      <div style={styles.block} ref={containerRef}>
+        <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}>
+          <DishIcon type={type === 'mains' ? 'main' : type === 'sides' ? 'side' : 'veg'} />
+          <h3 style={{ margin: 0, fontSize: "20px" }}>{title}</h3>
+        </div>
+        
+        {isComplete ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+            {selectedArray.filter(Boolean).map(m => (
+              <button key={m.id} style={{...styles.tag(true), padding: "12px 20px"}} onClick={() => toggleManualSelection(type, m, numRequired)}>
+                ✓ {formatNameUI(m.name)} <span style={{fontSize: "12px", marginLeft: "8px", opacity: 0.8}}>(Tap to change)</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          optionsArray.length === 0 ? (
+            <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
+          ) : (
+            renderGroupedDishesMulti(optionsArray, selectedArray, type === 'sides', (d) => toggleManualSelection(type, d, numRequired))
+          )
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={styles.container}>
       <h2 style={{ textAlign: "center", color: "#FF8CA1", margin: "10px 0 5px 0" }}>Dinner Planner</h2>
@@ -787,64 +913,7 @@ export default function DinnerApp() {
               <button style={styles.btn} onClick={handleAutoGenerate}>☝🏻 What's for dinner tonight?</button>
               {generatedMenu && (
                 <div ref={menuRef} style={{...styles.block, marginTop: "20px"}}>
-                  {autoWarning && (
-                    <div style={{ backgroundColor: "#FFE5E5", border: "2px solid #FF4D4D", padding: "15px", marginBottom: "20px", borderRadius: "12px", fontSize: "15px", color: "#990000", textAlign: "center", lineHeight: "1.4" }}>
-                      <strong>⚠️ We couldn't find a perfect match!</strong><br/>
-                      {autoWarning}
-                    </div>
-                  )}
-                  
-                  <h3 style={{ marginTop: 0, fontSize: "18px", color: "#333", lineHeight: "1.4" }}>
-                    Tonight's Menu<br/>
-                    <span style={{fontSize: "13px", fontWeight: "normal", color: "#777"}}></span>
-                  </h3>
-                  
-                  {generatedMenu.mains.map((m, i) => (
-                    <div style={styles.menuCard} key={`auto-m-${i}`}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => handleManualPick('mains')}>
-                        <DishIcon type="main" />
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(m.name)}</div>
-                      </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleSwapDish('mains', i); }} 
-                        style={{ background: "none", border: "none", fontSize: "24px", padding: "10px", cursor: "pointer" }}
-                      >
-                        🔄
-                      </button>
-                    </div>
-                  ))}
-                  
-                  {generatedMenu.sides.map((s, i) => (
-                    <div style={styles.menuCard} key={`auto-s-${i}`}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => handleManualPick('sides')}>
-                        <DishIcon type="side" />
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(s.name)}</div>
-                      </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleSwapDish('sides', i); }} 
-                        style={{ background: "none", border: "none", fontSize: "24px", padding: "10px", cursor: "pointer" }}
-                      >
-                        🔄
-                      </button>
-                    </div>
-                  ))}
-                  
-                  {generatedMenu.veg && (
-                    <div style={{...styles.menuCard, borderBottom: "none"}}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "15px", flex: 1 }} onClick={() => handleManualPick('veg')}>
-                        <DishIcon type="veg" />
-                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>{formatNameUI(generatedMenu.veg.name)}</div>
-                      </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleSwapDish('veg', 0); }} 
-                        style={{ background: "none", border: "none", fontSize: "24px", padding: "10px", cursor: "pointer" }}
-                      >
-                        🔄
-                      </button>
-                    </div>
-                  )}
-                  
-                  <div style={{ marginTop: "20px", paddingTop: "10px", borderTop: "1px solid #eee" }}>{renderShareSection(generatedMenu)}</div>
+                  {renderMenuSummary(generatedMenu, false)}
                 </div>
               )}
             </div>
@@ -877,51 +946,24 @@ export default function DinnerApp() {
                   onClick={() => setFilterNewOnly(!filterNewOnly)}
                   style={{ ...styles.tag(filterNewOnly), margin: 0, padding: "12px 14px", display: "flex", alignItems: "center", gap: "6px" }}
                 >
-                  ✨ New
+                  New
                 </button>
               </div>
               
               {diningSize === "one" ? (
-                <div style={styles.block} ref={mainRef}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Dish</h3></div>
-                  {manualOptionsAny.length === 0 ? (
-                    <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
-                  ) : (
-                    renderGroupedDishesMulti(manualOptionsAny, manualMenu.mains, false, (d) => toggleManualSelection('mains', d, 1))
-                  )}
-                </div>
+                renderManualSectionBlock('mains', 'Select Dish', 1, manualOptionsAny, manualMenu.mains, mainRef)
               ) : (
                 <>
-                  <div style={styles.block} ref={mainRef}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="main" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Main {numMains > 1 ? `(Pick ${numMains})` : ''}</h3></div>
-                    {manualOptionsMain.length === 0 ? (
-                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
-                    ) : (
-                      renderGroupedDishesMulti(manualOptionsMain, manualMenu.mains, false, (d) => toggleManualSelection('mains', d, numMains))
-                    )}
-                  </div>
-                  {numSides > 0 && (
-                    <div style={styles.block} ref={sideRef}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="side" /><h3 style={{ margin: 0, fontSize: "20px" }}>Select Side {numSides > 1 ? `(Pick ${numSides})` : ''}</h3></div>
-                      {manualOptionsSide.length === 0 ? (
-                        <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
-                      ) : (
-                        renderGroupedDishesMulti(manualOptionsSide, manualMenu.sides, true, (d) => toggleManualSelection('sides', d, numSides))
-                      )}
-                    </div>
-                  )}
-                  <div style={styles.block} ref={vegRef}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px", marginBottom: "15px" }}><DishIcon type="veg" /><h3 style={{ margin: "0", fontSize: "20px" }}>Select Vegetable</h3></div>
-                    {manualOptionsVeg.length === 0 ? (
-                      <div style={{ color: "#FF8CA1", fontStyle: "italic", padding: "10px 0" }}>No dishes match your exact inventory or search. Try changing your shopping cart preference above!</div>
-                    ) : (
-                      renderGroupedDishesMulti(manualOptionsVeg, [manualMenu.veg], false, (d) => toggleManualSelection('veg', d, 1))
-                    )}
-                  </div>
+                  {renderManualSectionBlock('mains', `Select Main ${numMains > 1 ? `(Pick ${numMains})` : ''}`, numMains, manualOptionsMain, manualMenu.mains, mainRef)}
+                  {numSides > 0 && renderManualSectionBlock('sides', `Select Side ${numSides > 1 ? `(Pick ${numSides})` : ''}`, numSides, manualOptionsSide, manualMenu.sides, sideRef)}
+                  {renderManualSectionBlock('veg', 'Select Vegetable', 1, manualOptionsVeg, [manualMenu.veg], vegRef)}
                 </>
               )}
+
               {((diningSize === "one" && manualMenu.mains.length === 1) || (diningSize !== "one" && manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null)) && (
-                <div style={{...styles.block, marginBottom: "30px"}} ref={shareRef}>{renderShareSection(manualMenu)}</div>
+                <div style={{...styles.block, marginBottom: "30px"}} ref={shareRef}>
+                  {renderMenuSummary(manualMenu, true)}
+                </div>
               )}
             </div>
           )}
