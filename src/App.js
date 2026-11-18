@@ -80,7 +80,7 @@ export default function DinnerApp() {
   const [manualMenu, setManualMenu] = useState({ mains: [], sides: [], veg: null });
   const [autoWarning, setAutoWarning] = useState(""); 
   
-  // NEW: Memory array to prevent immediate auto-generator repetition
+  // NEW: Short-term memory for auto generation
   const [seenAutoDishes, setSeenAutoDishes] = useState([]);
 
   const hasFetched = useRef(false);
@@ -93,13 +93,19 @@ export default function DinnerApp() {
 
   const masterIngredients = useMemo(() => Object.keys(inventory).sort(), [inventory]);
 
-  // Helper to determine if a dish is < 30 days old
+  // SMART "NEW" DETECTION: Looks for App-Added OR Sheet-Pasted dishes!
   const isNewDish = (d) => {
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    const now = Date.now();
-    if (!d.id.startsWith("c_")) return false; 
-    const timestamp = parseInt(d.id.split("_")[1]);
-    return !isNaN(timestamp) && (now - timestamp <= thirtyDaysMs);
+    // 1. Check if added via App in last 30 days
+    if (String(d.id).startsWith("c_")) {
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const timestamp = parseInt(String(d.id).split("_")[1]);
+      if (!isNaN(timestamp) && (Date.now() - timestamp <= thirtyDaysMs)) return true;
+    }
+    // 2. Check if manually added to Google Sheet (last 15 items in the database)
+    const idx = dishes.findIndex(x => x.id === d.id);
+    if (idx >= 0 && idx >= dishes.length - 15) return true;
+    
+    return false;
   };
 
   // --- BACKGROUND CLOUD SYNC ---
@@ -232,6 +238,28 @@ export default function DinnerApp() {
     setNewDish({ name: "", category: ["main"], protein: "", ingredients: [], remarks: "", onePerson: false });
   };
 
+  // AUTO SCROLL LOGIC
+  useEffect(() => {
+    if (mode === "auto" && generatedMenu && menuRef.current) setTimeout(() => menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }, [generatedMenu, mode]);
+
+  useEffect(() => {
+    if (mode === "manual") {
+      if (diningSize === "one") {
+         if (manualMenu.mains.length === 1 && shareRef.current) setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      } else {
+          const numMains = diningSize === "xlarge" ? 2 : 1;
+          const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
+          if (manualMenu.mains.length === numMains && manualMenu.sides.length < numSides && sideRef.current) setTimeout(() => sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg === null && vegRef.current) setTimeout(() => vegRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          else if (manualMenu.mains.length === numMains && manualMenu.sides.length === numSides && manualMenu.veg !== null && shareRef.current) setTimeout(() => shareRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      }
+    }
+  }, [manualMenu, mode, diningSize]);
+
+  // MENU GENERATION LOGIC
+  const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
+
   const getMissingIngredients = (menu) => {
     let required = [];
     if (menu.mains) menu.mains.forEach(m => { if(m) required.push(...m.ingredients); });
@@ -239,119 +267,97 @@ export default function DinnerApp() {
     if (menu.veg) required.push(...menu.veg.ingredients);
     
     const uniqueRequired = [...new Set(required)];
-    const availableIngredientsList = Object.keys(inventory).filter((i) => inventory[i]);
     const availableLower = availableIngredientsList.map(i => i.trim().toLowerCase());
     
     return uniqueRequired.filter(ing => !availableLower.includes(ing.trim().toLowerCase()));
   };
 
-  // --- SMART GENERATION ENGINE ---
+  // --- NEW: SCORING ENGINE ---
   const handleAutoGenerate = () => {
-    let finalMenu = null;
-    let finalMissingCount = 999;
-    let usedPoolIndex = -1;
-
-    // Define priority pools based on the "New" filter and Memory
-    let candidatePools = [];
-    if (filterNewOnly) {
-        candidatePools.push(dishes.filter(d => isNewDish(d) && !seenAutoDishes.includes(d.id))); // Priority 1: Unseen New
-        candidatePools.push(dishes.filter(d => !seenAutoDishes.includes(d.id))); // Priority 2: Unseen Old (Fallback)
-    } else {
-        candidatePools.push(dishes.filter(d => !seenAutoDishes.includes(d.id))); // Priority 1: Unseen Any
-    }
-    candidatePools.push(dishes); // Priority Ultimate: Reset memory and use anything
-
-    const tryGenerateFromPool = (pool) => {
-        let bestMenu = null;
-        let bestMissingCount = 999;
+    let bestMenu = null;
+    let bestMissingCount = 999;
+    
+    // Core Engine: Scores dishes so New+Unseen is grabbed first, seamlessly falling back to Old+Seen if needed
+    const pickDish = (pool, usedProteins, currentMenuDishes) => {
+        const available = pool.filter(d => !usedProteins.includes(d.protein) && !currentMenuDishes.some(cmd => cmd && cmd.id === d.id));
+        if (available.length === 0) return null;
         
-        for(let attempts = 0; attempts < 100; attempts++) {
-            let usedProteins = [];
-            let tempMenu = { mains: [], sides: [], veg: null };
-            let isValid = true;
-
-            if (diningSize === "one") {
-                const onePersonOptions = pool.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
-                if (onePersonOptions.length > 0) tempMenu.mains.push(getRandomDish(onePersonOptions));
-                else isValid = false;
-            } else {
-                const mains = pool.filter(d => d.category.includes("main"));
-                const sides = pool.filter(d => d.category.includes("side"));
-                const vegs = pool.filter(d => d.category.includes("veg"));
-
-                const numMains = diningSize === "xlarge" ? 2 : 1;
-                const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
-
-                for (let i = 0; i < numMains; i++) {
-                    const availableMains = mains.filter(m => !usedProteins.includes(m.protein) && !tempMenu.mains.includes(m));
-                    if (availableMains.length > 0) {
-                        const picked = getRandomDish(availableMains);
-                        tempMenu.mains.push(picked);
-                        if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
-                    } else isValid = false;
-                }
-
-                for (let i = 0; i < numSides; i++) {
-                    const availableSides = sides.filter(s => !usedProteins.includes(s.protein) && !tempMenu.sides.includes(s));
-                    if (availableSides.length > 0) {
-                        const picked = getRandomDish(availableSides);
-                        tempMenu.sides.push(picked);
-                        if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
-                    } else isValid = false;
-                }
-
-                const availableVegs = vegs.filter(v => !usedProteins.includes(v.protein));
-                if (availableVegs.length > 0) tempMenu.veg = getRandomDish(availableVegs);
-                else isValid = false;
-            }
-
-            if (!isValid) continue;
-
-            const missingCount = getMissingIngredients(tempMenu).length;
-            if (missingCount < bestMissingCount) { bestMissingCount = missingCount; bestMenu = tempMenu; }
-            if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
-        }
-        return { menu: bestMenu, missing: bestMissingCount };
+        const scoreDish = (d) => {
+            const isNew = isNewDish(d);
+            const isSeen = seenAutoDishes.includes(d.id);
+            if (filterNewOnly && isNew && !isSeen) return 4; // Ultimate Priority
+            if (!isSeen) return 3;                           // Unseen Old Dish
+            if (filterNewOnly && isNew && isSeen) return 2;  // Seen New Dish
+            return 1;                                        // Seen Old Dish (Desperate)
+        };
+        
+        const maxScore = Math.max(...available.map(scoreDish));
+        const topCandidates = available.filter(d => scoreDish(d) === maxScore);
+        return getRandomDish(topCandidates);
     };
 
-    // Cycle through pools until we find a match
-    for (let i = 0; i < candidatePools.length; i++) {
-        if (candidatePools[i].length === 0) continue;
-        
-        const { menu, missing } = tryGenerateFromPool(candidatePools[i]);
-        if (menu && missing < finalMissingCount) {
-            finalMenu = menu;
-            finalMissingCount = missing;
-            usedPoolIndex = i;
+    for(let attempts = 0; attempts < 100; attempts++) {
+        let usedProteins = [];
+        let tempMenu = { mains: [], sides: [], veg: null };
+        let isValid = true;
+
+        if (diningSize === "one") {
+            const onePersonOptions = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
+            const picked = pickDish(onePersonOptions, usedProteins, [...tempMenu.mains]);
+            if (picked) { tempMenu.mains.push(picked); } 
+            else isValid = false;
+        } else {
+            const mains = dishes.filter(d => d.category.includes("main"));
+            const sides = dishes.filter(d => d.category.includes("side"));
+            const vegs = dishes.filter(d => d.category.includes("veg"));
+
+            const numMains = diningSize === "xlarge" ? 2 : 1;
+            const numSides = diningSize === "small" ? 0 : diningSize === "large" ? 2 : 1;
+
+            for (let i = 0; i < numMains; i++) {
+                const picked = pickDish(mains, usedProteins, [...tempMenu.mains]);
+                if (picked) {
+                    tempMenu.mains.push(picked);
+                    if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
+                } else isValid = false;
+            }
+
+            for (let i = 0; i < numSides; i++) {
+                const picked = pickDish(sides, usedProteins, [...tempMenu.sides]);
+                if (picked) {
+                    tempMenu.sides.push(picked);
+                    if (picked.protein !== "none" && picked.protein !== "seafood") usedProteins.push(picked.protein);
+                } else isValid = false;
+            }
+
+            const pickedVeg = pickDish(vegs, usedProteins, tempMenu.veg ? [tempMenu.veg] : []);
+            if (pickedVeg) tempMenu.veg = pickedVeg;
+            else isValid = false;
         }
-        if (finalMenu && (shoppingMode === "any" || (shoppingMode === "minimal" && finalMissingCount <= 3) || (shoppingMode === "none" && finalMissingCount === 0))) {
-            break;
-        }
+
+        if (!isValid) continue;
+
+        const missingCount = getMissingIngredients(tempMenu).length;
+        if (missingCount < bestMissingCount) { bestMissingCount = missingCount; bestMenu = tempMenu; }
+        if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
     }
 
-    if (finalMenu) {
+    if (bestMenu) {
+      // Memory Management: Flush if we've seen almost everything to keep it fresh
       const generatedDishIds = [];
-      if (finalMenu.mains) finalMenu.mains.forEach(m => generatedDishIds.push(m.id));
-      if (finalMenu.sides) finalMenu.sides.forEach(s => generatedDishIds.push(s.id));
-      if (finalMenu.veg) generatedDishIds.push(finalMenu.veg.id);
+      if (bestMenu.mains) bestMenu.mains.forEach(m => generatedDishIds.push(m.id));
+      if (bestMenu.sides) bestMenu.sides.forEach(s => generatedDishIds.push(s.id));
+      if (bestMenu.veg) generatedDishIds.push(bestMenu.veg.id);
 
-      if (usedPoolIndex === candidatePools.length - 1) {
-          // If we had to fall back to the ultimate pool, reset memory to just this menu
-          setSeenAutoDishes(generatedDishIds);
-      } else {
-          // Otherwise, append to our recent memory
-          setSeenAutoDishes([...seenAutoDishes, ...generatedDishIds]);
-      }
+      if (seenAutoDishes.length > dishes.length - 10) setSeenAutoDishes(generatedDishIds);
+      else setSeenAutoDishes([...seenAutoDishes, ...generatedDishIds]);
 
-      if (shoppingMode !== "any" && finalMissingCount > (shoppingMode === "none" ? 0 : 3)) {
-        setAutoWarning(`We couldn't find a perfect match for your pantry. Here is the closest option! (Missing ${finalMissingCount} items)`);
+      if (shoppingMode !== "any" && bestMissingCount > (shoppingMode === "none" ? 0 : 3)) {
+        setAutoWarning(`We couldn't find a perfect match for your pantry. Here is the closest option! (Missing ${bestMissingCount} items)`);
       } else {
         setAutoWarning("");
       }
-      setGeneratedMenu(finalMenu);
-      
-      // Auto Scroll
-      setTimeout(() => { if (menuRef.current) menuRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+      setGeneratedMenu(bestMenu);
     } else {
       alert("We couldn't generate a valid menu. Try adding more dishes to your database!");
     }
@@ -371,45 +377,45 @@ export default function DinnerApp() {
     ].filter(d => d);
 
     const usedProteins = otherDishes.map(d => d.protein).filter(p => p !== "none" && p !== "seafood");
+
     const targetCategory = type === 'mains' ? 'main' : type === 'sides' ? 'side' : 'veg';
-    
     let basePool = dishes.filter(d => d.category.includes(targetCategory));
     if (diningSize === "one") basePool = dishes.filter(d => d.onePerson && (d.category.includes("main") || d.category.includes("side")));
 
-    let candidatePools = [];
-    if (!isManual && filterNewOnly) {
-        candidatePools.push(basePool.filter(d => isNewDish(d) && !seenAutoDishes.includes(d.id)));
-        candidatePools.push(basePool.filter(d => !seenAutoDishes.includes(d.id)));
-    } else if (!isManual) {
-        candidatePools.push(basePool.filter(d => !seenAutoDishes.includes(d.id)));
-    }
-    candidatePools.push(basePool); 
+    // Scoring engine for manual swapping
+    const scoreDish = (d) => {
+        const isNew = isNewDish(d);
+        const isSeen = seenAutoDishes.includes(d.id);
+        if (!isManual && filterNewOnly && isNew && !isSeen) return 4;
+        if (!isManual && !isSeen) return 3;
+        if (!isManual && filterNewOnly && isNew && isSeen) return 2;
+        return 1;
+    };
+
+    // Sort by highest score first, randomizing ties
+    const shuffledPool = [...basePool].sort((a, b) => {
+        const scoreDiff = scoreDish(b) - scoreDish(a);
+        return scoreDiff !== 0 ? scoreDiff : Math.random() - 0.5;
+    });
 
     let bestCandidate = null;
     let bestMissingCount = 999;
-    let usedPoolIndex = -1;
     
-    for (let i = 0; i < candidatePools.length; i++) {
-        const shuffledPool = [...candidatePools[i]].sort(() => 0.5 - Math.random());
-        for (let d of shuffledPool) {
-           if (d.id === oldDish.id) continue; 
-           if (usedProteins.includes(d.protein)) continue; 
-           
-           const testMenu = { ...currentMenu };
-           if (type === 'veg') testMenu.veg = d;
-           else testMenu[type][index] = d;
-           
-           const missingCount = getMissingIngredients(testMenu).length;
-           if (missingCount < bestMissingCount) {
-               bestMissingCount = missingCount;
-               bestCandidate = d;
-               usedPoolIndex = i;
-           }
-           if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
-        }
-        if (bestCandidate && (shoppingMode === "any" || (shoppingMode === "minimal" && bestMissingCount <= 3) || (shoppingMode === "none" && bestMissingCount === 0))) {
-            break;
-        }
+    for (let d of shuffledPool) {
+       if (d.id === oldDish.id) continue; 
+       if (usedProteins.includes(d.protein)) continue; 
+       
+       const testMenu = { ...currentMenu };
+       if (type === 'veg') testMenu.veg = d;
+       else testMenu[type][index] = d;
+       
+       const missingCount = getMissingIngredients(testMenu).length;
+       if (missingCount < bestMissingCount) {
+           bestMissingCount = missingCount;
+           bestCandidate = d;
+       }
+       
+       if (shoppingMode === "any" || (shoppingMode === "minimal" && missingCount <= 3) || (shoppingMode === "none" && missingCount === 0)) break; 
     }
 
     if (!bestCandidate) {
@@ -418,11 +424,8 @@ export default function DinnerApp() {
     }
 
     if (!isManual) {
-       if (usedPoolIndex === candidatePools.length - 1) {
-           setSeenAutoDishes([bestCandidate.id]);
-       } else {
-           setSeenAutoDishes([...seenAutoDishes, bestCandidate.id]);
-       }
+        if (seenAutoDishes.length > dishes.length - 10) setSeenAutoDishes([bestCandidate.id]);
+        else setSeenAutoDishes([...seenAutoDishes, bestCandidate.id]);
     }
 
     if (type === 'veg') currentMenu.veg = bestCandidate;
@@ -518,7 +521,6 @@ export default function DinnerApp() {
       current.push(dish); 
       setManualSearch(""); 
       
-      // Auto-scroll to next section
       if (current.length === maxLimit) {
         setTimeout(() => {
           if (type === 'mains' && sideRef.current) sideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -965,7 +967,7 @@ export default function DinnerApp() {
                 onClick={() => setFilterNewOnly(!filterNewOnly)}
                 style={{ ...styles.tag(filterNewOnly), margin: 0, padding: "8px 16px" }}
               >
-                New Dishes Only
+                Feel like something new today
               </button>
             </div>
           </div>
